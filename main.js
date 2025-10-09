@@ -51,6 +51,11 @@ const inputTabs = [tabText, tabImage, tabAi];
 const inputContents = [contentText, contentImage, contentAi];
 const controls = [textInput, numQuestionsInput, questionTypeSelect, difficultySelect, questionStyleSelect, studentLevelSelect];
 
+// 【新增】取得自訂選項 UI 元素的參照
+const textTypeSelect_custom = document.getElementById('text-type-select');
+const customTextTypeInput = document.getElementById('custom-text-type-input');
+const toneSelect_custom = document.getElementById('tone-select');
+const customToneInput = document.getElementById('custom-tone-input');
 
 // --- 事件監聽器與初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -220,4 +225,25 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.hidePostDownloadModal();
         handlers.clearAllInputs();
     }, 'clearAndNewBtn');
+
+    // 【新增】處理自訂選項顯示/隱藏的事件監聽器
+    utils.addSafeEventListener(textTypeSelect_custom, 'change', (e) => {
+        if(customTextTypeInput) {
+            if (e.target.value === 'custom') {
+                customTextTypeInput.classList.remove('hidden');
+            } else {
+                customTextTypeInput.classList.add('hidden');
+            }
+        }
+    }, 'textTypeSelect_custom');
+
+    utils.addSafeEventListener(toneSelect_custom, 'change', (e) => {
+        if(customToneInput) {
+            if (e.target.value === 'custom') {
+                customToneInput.classList.remove('hidden');
+            } else {
+                customToneInput.classList.add('hidden');
+            }
+        }
+    }, 'toneSelect_custom');
 });

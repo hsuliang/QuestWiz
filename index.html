@@ -6,8 +6,6 @@
     <title>ㄚ亮笑長的題目生成器</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link rel="icon" type="image/jpeg" href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIbGNtcwIQAABtbnRyUkdCIFhZWiAH4gADABQACQAOAB1hYCNzcTVNGVAAAAABzYXdzYCNybAAAAAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWhhbmRhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkZXNjAAAAAAAAAB5jcmVhdGVkIGJ5IHNhd3NjcHRybCBU29sa2l0LiAyLjMAAAAADGN1cnYAAAAAAAAEAAAAAAUACgAPABQAGQAeACMAKAAtADIANwA7AEAARQBKAE8AVABZAF4AYwBoAG0AcgB3AHwAgQCGAIsAkACVAJoAnwCkAKkArgCyALcAvADBAMYAywDQANUA2wDgAOUA6wDwAPYA+wEBAQcBDQETARkBHwElASsBMgE4AT4BRQFMAVIBWQFgAWcBbgF3AXwBgwGLAZwBqQG1AcEByQHRAdkB4QHpAfIB+gIDAgwCFAIdAiYCLwI cuartoAkECSwJUAl0CYwJtAoACjwKgArQCsAK2AsgC3gLwAwYDIwMmMzkDWwNzA3oDhQOLA5YDogOuA7oDxwPTA+AD7AP5BAYEEwQgBC0EOwRIBFUEYwRxBH4EjASaBKgEtgTEBNME4QTwBP4FDQUcBSsFOgVJBVgFZwV3BYYFlgWmBbUFxQXVBeUF9gYGBhYGJwY3BkgGWQZqBnsGjAadBq8GwAbRBuMG9QcHBxkHKwc9B0EHYQd0B4YHmQesB78H0gflB/gICwgfCDIIRghaCG4IggiWCKoIvgjSCOcI+wkQCSUJOglPCWQJeQmPCaQJugnPCeUJ+woRCicKPQpUCmoKgQqYCq4KxQrcCvMLCwsiCzkLUQtpC4ALmAuwC8gL4Qv5DBIMKgxDDFwMdQyODKcMwAzZDPMNDQ0mDUANWg10DY4NqQ3DDd4N+A4TDi4OSQ5kDn8Omw62DtIO7g8JDyUPQQ9eD3oPlg+zD88P7BAJECYQQxBhEH4QmxC5ENcQ9RETETERTxFtEYwRqhHJEfASDxMlE0gTow Wilhelmina Triesenberg">
     
@@ -182,6 +180,33 @@
                                         <label for="topic-input" class="block text-sm font-medium text-gray-700 mb-1">請輸入測驗主題、單字或語詞：</label>
                                         <input type="text" id="topic-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="例如：光合作用、永續發展、apple, banana, run...">
                                      </div>
+                                     <div>
+                                        <label for="text-type-select" class="block text-sm font-medium text-gray-700 mb-1">請選擇文本類型：</label>
+                                        <select id="text-type-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                            <option value="科普說明文" selected>科普說明文</option>
+                                            <option value="情境故事文">情境故事文</option>
+                                            <option value="議論文">議論文</option>
+                                            <option value="實用操作說明">實用操作說明</option>
+                                            <option value="對話式劇本">對話式劇本</option>
+                                            <option value="custom">自訂...</option>
+                                        </select>
+                                        <input type="text" id="custom-text-type-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂文本類型...">
+                                     </div>
+                                     <div>
+                                        <label for="learning-objectives-input" class="block text-sm font-medium text-gray-700 mb-1">請輸入核心學習目標或關鍵詞彙 (條列式，AI會將其融入文章中)：</label>
+                                        <textarea id="learning-objectives-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="例如：&#10;1. 理解光合作用需要光、水和二氧化碳。&#10;2. 知道會產生葡萄糖和氧氣。"></textarea>
+                                     </div>
+                                     <div>
+                                        <label for="tone-select" class="block text-sm font-medium text-gray-700 mb-1">請選擇寫作語氣：</label>
+                                        <select id="tone-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                            <option value="客觀中立" selected>客觀中立</option>
+                                            <option value="活潑有趣">活潑有趣</option>
+                                            <option value="嚴謹學術">嚴謹學術</option>
+                                            <option value="循循善誘">循循善誘</option>
+                                            <option value="custom">自訂...</option>
+                                        </select>
+                                        <input type="text" id="custom-tone-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂寫作語氣...">
+                                     </div>
                                      <div class="flex items-center justify-center pt-2">
                                          <input id="competency-based-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                          <label for="competency-based-checkbox" class="ml-2 block text-sm font-medium text-gray-900">✨ 啟用素養導向模式</label>
@@ -218,26 +243,26 @@
                             </div>
                             <div>
                                 <label for="format-select" class="block text-sm font-medium text-gray-700">匯出格式：</label>
-                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
+                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="" disabled selected>請選擇...</option>
                                     <option value="wordwall">Wordwall</option> <option value="kahoot">Kahoot!</option> <option value="wayground">Wayground</option> <option value="loilonote">LoiLoNote</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="question-type-select" class="block text-sm font-medium text-gray-700">題目類型：</label>
-                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
+                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="multiple_choice" selected>選擇題</option> <option value="true_false">是非題</option> <option value="mixed">是非+選擇題</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="difficulty-select" class="block text-sm font-medium text-gray-700">題目難度：</label>
-                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
+                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="中等" selected>中等 (預設)</option> <option value="簡單">簡單</option> <option value="困難">困難</option>
                                 </select>
                             </div>
                             <div class="sm:col-span-2">
                                 <label for="question-style-select" class="block text-sm font-medium text-gray-700">出題風格：</label>
-                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
+                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="knowledge-recall" selected>知識記憶型 (預設)</option> <option value="competency-based">✨ 素養導向型</option>
                                 </select>
                             </div>
@@ -281,7 +306,7 @@
 
             <footer class="text-center mt-12 text-sm text-gray-500">
                 <p>
-                    <span id="version-btn" class="cursor-pointer hover:underline">v7.8 安全更新</span> | 
+                    <span id="version-btn" class="cursor-pointer hover:underline">v8.0 功能增強</span> | 
                     由 Google Gemini 強力驅動 | 
                     <a href="https://bit.ly/Aliang" target="_blank" class="themed-accent-text themed-accent-text-hover">ㄚ亮笑長練功坊</a> | 
                     <a href="https://gemini.google.com/share/684396634923" target="_blank" class="themed-accent-text themed-accent-text-hover">程式簡介與使用說明</a> |

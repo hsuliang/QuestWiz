@@ -5,6 +5,7 @@ const studentLevelSelect = document.getElementById('student-level-select');
 const formatSelect = document.getElementById('format-select');
 
 /**
+ * 【修改】加上 export，讓此函式可以被其他檔案使用
  * 新增：帶有重試機制的 Fetch 函式
  * @param {string} url - 請求的 URL
  * @param {object} options - Fetch 的設定選項
@@ -12,7 +13,7 @@ const formatSelect = document.getElementById('format-select');
  * @param {number} delay - 初始延遲時間 (毫秒)
  * @returns {Promise<Response>}
  */
-async function fetchWithRetry(url, options, retries = 3, delay = 2000) {
+export async function fetchWithRetry(url, options, retries = 3, delay = 2000) {
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url, options);
@@ -61,7 +62,7 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key not available.");
 
-    const apiUrl = CONFIG.API_URL; // 【修改】URL 不再拼接 API Key
+    const apiUrl = CONFIG.API_URL;
     const selectedFormat = formatSelect ? formatSelect.value : '';
     const needsExplanation = selectedFormat === 'loilonote' || selectedFormat === 'wayground';
 
@@ -144,7 +145,7 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
         method: 'POST', 
         headers: { 
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey // 【修改】在此處加入 API Key 標頭
+            'x-goog-api-key': apiKey
         }, 
         body: JSON.stringify(payload), 
         signal 

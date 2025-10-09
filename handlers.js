@@ -1,6 +1,6 @@
 import { CONFIG, contentLoadingMessages, questionLoadingMessages } from './config.js';
 import * as state from './state.js';
-import { getApiKey, generateSingleBatch } from './api.js';
+import { getApiKey, generateSingleBatch, fetchWithRetry } from './api.js';
 import * as ui from './ui.js';
 import { isEnglish, debounce, isAutoGenerateEnabled } from './utils.js';
 
@@ -22,6 +22,11 @@ const studentLevelSelect = document.getElementById('student-level-select');
 const tabImage = document.getElementById('tab-image');
 const tabText = document.getElementById('tab-text');
 const topicInput = document.getElementById('topic-input');
+const textTypeSelect = document.getElementById('text-type-select');
+const customTextTypeInput = document.getElementById('custom-text-type-input');
+const learningObjectivesInput = document.getElementById('learning-objectives-input');
+const toneSelect = document.getElementById('tone-select');
+const customToneInput = document.getElementById('custom-tone-input');
 const competencyBasedCheckbox = document.getElementById('competency-based-checkbox');
 const previewLoader = document.getElementById('preview-loader');
 const loadingText = document.getElementById('loading-text');
@@ -36,7 +41,6 @@ const previewActions = document.getElementById('preview-actions');
  */
 function loadScript(src) {
     return new Promise((resolve, reject) => {
-        // 如果 script 已經存在，就直接 resolve
         if (document.querySelector(`script[src="${src}"]`)) {
             return resolve();
         }
@@ -61,39 +65,67 @@ export async function generateContentFromTopic() {
     if (!topicInput || !previewLoader) return;
 
     const topic = topicInput.value;
-    if (!topic.trim()) return ui.showToast('請輸入一個主題、單字或語詞！', 'error');
+    if (!topic.trim()) {
+        return ui.showToast('請輸入一個主題、單字或語詞！', 'error');
+    }
     
-    previewLoader.classList.remove('hidden');
-    if (loadingText) loadingText.textContent = contentLoadingMessages[Math.floor(Math.random() * contentLoadingMessages.length)];
+    // 【修改】智慧取值與空值檢查
+    const textType = textTypeSelect.value === 'custom' ? customTextTypeInput.value.trim() : textTypeSelect.value;
+    const tone = toneSelect.value === 'custom' ? customToneInput.value.trim() : toneSelect.value;
+
+    if ((textTypeSelect.value === 'custom' && !textType) || (toneSelect.value === 'custom' && !tone)) {
+        return ui.showToast('「自訂」選項的內容不能為空！', 'error');
+    }
+
+    ui.showLoader('AI 作家生成中...');
     
     try {
         const studentLevel = studentLevelSelect.value;
-        const isCompetencyBased = competencyBasedCheckbox.checked;
-        const apiUrl = CONFIG.API_URL; // 【修改】URL 不再拼接 API Key
+        const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
+        const learningObjectives = learningObjectivesInput.value;
+        const apiUrl = CONFIG.API_URL;
         const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
         const wordCount = wordCountMap[studentLevel];
-        const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
+        
+        const topicSection = learningObjectives.trim()
+            ? `文章的核心主題是「${topic}」，並且必須清晰地圍繞以下核心學習目標或關鍵詞彙來撰寫：\n${learningObjectives}`
+            : `文章的核心主題是「${topic}」。`;
+
+        const systemInstructionText = `
+P (Persona):
+你是一位專為「${studentGradeText}」學生編寫教材的頂尖「${textType}」設計專家與作者。
+
+A (Act):
+你的任務是根據下方的要求，創作一篇長度約為 ${wordCount} 字的高品質教學文章。
+
+R (Recipient):
+這篇文章的目標讀者是「${studentGradeText}」的學生，請確保內容的深度與用詞符合他們的認知水平。
+
+T (Topic):
+${topicSection}
+
+S (Structure):
+請嚴格遵守以下格式與風格要求：
+1. 文章體裁：必須是「${textType}」。
+2. 寫作語氣：必須是「${tone}」。
+3. 文章結構：請為文章加上一個吸引人的標題，並將內容分成數個段落以便閱讀。
+4. 最終產出：直接提供完整的文章內容，不要包含任何額外的說明或開場白。
+        `;
         
         const requestBody = {
             "contents": [{
                 "parts": [{ "text": `主題：${topic}` }]
             }],
             "systemInstruction": {
-                "parts": [{
-                    "text": isCompetencyBased 
-                        ? `你是一位頂尖的 K-12 教材設計師與說故事專家，專長是將生硬的知識點轉化為引人入勝的生活情境或故事，以培養學生的素養能力。請根據使用者提供的核心主題：「${topic}」，為「${studentGradeText}」程度的學生，創作一篇長度約為 ${wordCount} 字的素養導向短文。\n- 這篇短文應該包含一個清晰的「情境」或「待解決的問題」。\n- 請將核心主題的相關知識，自然地融入故事情節或問題描述中，而不是條列式地說明。\n- 文章風格需生動有趣，能引發學生的閱讀興趣與思考。\n- 最終產出的內容必須是一篇完整的文章，可以直接用於出題。`
-                        : (topic.includes(',') || /^[a-zA-Z\s,]+$/.test(topic) && topic.split(/\s+|,/).filter(Boolean).length <= 10
-                            ? `你是一位為K12學生編寫教材的創意寫作專家。請使用使用者提供的單字或語詞，為「${studentGradeText}」的學生，撰寫一篇有趣且連貫、長度約為 ${wordCount} 字的故事或閱讀短文。請確保這些詞彙自然地融入文章中。`
-                            : `你是一位知識淵博的教材編寫專家。請根據使用者提供的主題，為「${studentGradeText}」的學生，生成一段約 ${wordCount} 字的簡潔科普短文。`)
-                }]
+                "parts": [{ "text": systemInstructionText }]
             }
         };
 
-        const response = await fetch(apiUrl, { 
+        const response = await fetchWithRetry(apiUrl, { 
             method: 'POST', 
             headers: { 
                 'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey // 【修改】在此處加入 API Key 標頭
+                'x-goog-api-key': apiKey
             }, 
             body: JSON.stringify(requestBody) 
         });
@@ -111,7 +143,10 @@ export async function generateContentFromTopic() {
             ui.showToast('學習內文已成功生成！', 'success');
             if (copyContentBtn) copyContentBtn.classList.remove('hidden');
             if (tabText) tabText.click();
-            if (isCompetencyBased && questionStyleSelect) { questionStyleSelect.value = 'competency-based'; }
+            if (document.getElementById('competency-based-checkbox')) {
+                document.getElementById('competency-based-checkbox').checked = true;
+            }
+            if (questionStyleSelect) { questionStyleSelect.value = 'competency-based'; }
             triggerOrUpdate();
         } else { 
             throw new Error('AI未能生成內容，請檢查您的 API Key 或稍後再試。'); 
@@ -120,13 +155,13 @@ export async function generateContentFromTopic() {
         console.error('生成內文時發生錯誤:', error);
         ui.showToast(error.message, 'error');
     } finally {
-        if (previewLoader) previewLoader.classList.add('hidden'); 
+        ui.hideLoader();
     }
 }
 
-/**
- * 根據「自動出題」模式決定是觸發生成還是只更新按鈕
- */
+// ... (檔案中其餘的函式保持不變) ...
+// (以下省略與上方修改無關的其餘程式碼，以節省篇幅)
+// ... (The rest of the functions in the file remain unchanged) ...
 export function triggerOrUpdate() {
     if (isAutoGenerateEnabled()) {
         debouncedGenerate();
@@ -135,24 +170,16 @@ export function triggerOrUpdate() {
     }
 }
 export const debouncedGenerate = debounce(triggerQuestionGeneration, CONFIG.DEBOUNCE_DELAY);
-
-
-/**
- * 觸發題目生成流程的入口函式
- */
 export async function triggerQuestionGeneration() {
     if (tabImage && tabImage.classList.contains('active') && state.getUploadedImages().length === 0) {
         return ui.showToast('請先上傳圖片！', 'error');
     }
-
     const text = textInput ? textInput.value : '';
     if (!text.trim() && state.getUploadedImages().length === 0) return;
-
     if (previewPlaceholder && !previewPlaceholder.classList.contains('hidden')) {
         previewPlaceholder.classList.add('hidden');
     }
-
-    let languageChoice = 'chinese'; // 預設為中文
+    let languageChoice = 'chinese';
     if (isEnglish(text)) {
         try {
             languageChoice = await ui.askForLanguageChoice();
@@ -161,47 +188,34 @@ export async function triggerQuestionGeneration() {
             return; 
         }
     }
-    
     proceedWithGeneration(languageChoice);
 }
-
-
-/**
- * 處理題目生成的流程，包含分批呼叫 API
- */
 async function proceedWithGeneration(languageChoice) {
     const apiKey = getApiKey();
     if (!apiKey) {
         return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
     }
-
     const text = textInput ? textInput.value : '';
     const totalQuestions = numQuestionsInput ? parseInt(numQuestionsInput.value, 10) : 0;
     const questionType = questionTypeSelect ? questionTypeSelect.value : 'multiple_choice';
     const difficulty = difficultySelect ? difficultySelect.value : '中等';
     const questionStyle = questionStyleSelect ? questionStyleSelect.value : 'knowledge-recall';
     const studentLevel = studentLevelSelect ? studentLevelSelect.value : '1-2';
-
     if ((!text.trim() && state.getUploadedImages().length === 0) || totalQuestions <= 0) {
         if (questionsContainer) questionsContainer.innerHTML = '';
         if (previewActions) previewActions.classList.add('hidden');
         if (previewPlaceholder) previewPlaceholder.classList.remove('hidden');
         return;
     }
-
     if (state.getCurrentRequestController()) {
         state.getCurrentRequestController().abort();
     }
     state.setCurrentRequestController(new AbortController());
     const signal = state.getCurrentRequestController().signal;
-
-    if (previewLoader) previewLoader.classList.remove('hidden');
-    if (loadingText) loadingText.textContent = questionLoadingMessages[Math.floor(Math.random() * questionLoadingMessages.length)];
+    ui.showLoader(questionLoadingMessages[Math.floor(Math.random() * questionLoadingMessages.length)]);
     if (questionsContainer) questionsContainer.innerHTML = '';
     if (previewActions) previewActions.classList.add('hidden');
-
     let allGeneratedQs = [];
-    
     try {
         const BATCH_SIZE = CONFIG.API_BATCH_SIZE;
         const numBatches = Math.ceil(totalQuestions / BATCH_SIZE);
@@ -211,7 +225,6 @@ async function proceedWithGeneration(languageChoice) {
             const batchResult = await generateSingleBatch(questionsInBatch, questionType, difficulty, text, state.getUploadedImages(), questionStyle, signal, languageChoice, studentLevel);
             allGeneratedQs = allGeneratedQs.concat(batchResult);
         }
-        
         if (allGeneratedQs.length > 0) {
             state.setGeneratedQuestions(allGeneratedQs);
             ui.renderQuestionsForEditing(state.getGeneratedQuestions());
@@ -225,8 +238,6 @@ async function proceedWithGeneration(languageChoice) {
              return; 
          }
          console.error('生成題目時發生錯誤:', error);
-
-         // --- 優化的錯誤提示邏輯 ---
          let userFriendlyMessage = error.message;
          if (error.message.includes('503')) {
              userFriendlyMessage = "伺服器目前忙碌中(503)，已自動重試但仍失敗，請稍後再試或減少單次題目數量。";
@@ -236,19 +247,13 @@ async function proceedWithGeneration(languageChoice) {
              userFriendlyMessage = "網路連線失敗，請檢查您的網路設定。";
          }
          ui.showToast(userFriendlyMessage, 'error');
-         
          if (questionsContainer) questionsContainer.innerHTML = '';
          if (previewPlaceholder) previewPlaceholder.classList.remove('hidden');
     } finally {
-        if (previewLoader) previewLoader.classList.add('hidden');
+        ui.hideLoader();
         ui.updateRegenerateButtonState();
     }
 }
-
-
-/**
- * 處理檔案輸入 (txt/pdf)
- */
 export function handleFile(file) {
     if (fileErrorDisplay) fileErrorDisplay.textContent = ''; 
     if (fileNameDisplay) fileNameDisplay.textContent = ''; 
@@ -262,13 +267,9 @@ export function handleFile(file) {
         reader.onload = async (e) => {
             try {
                 ui.showLoader('正在讀取 PDF 檔案...');
-                // 改用手動建立 script 標籤的方式動態載入
                 await loadScript(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js`);
-                
-                // 載入成功後，pdfjsLib 會存在於 window 物件上
                 const pdfjsLib = window.pdfjsLib;
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
-                
                 const pdf = await pdfjsLib.getDocument(new Uint8Array(e.target.result)).promise;
                 let text = '';
                 for (let i = 1; i <= pdf.numPages; i++) { 
@@ -296,10 +297,6 @@ export function handleFile(file) {
         reader.readAsText(file);
     }
 }
-
-/**
- * 處理圖片檔案上傳
- */
 export function handleImageFiles(newFiles) {
     if (!newFiles || newFiles.length === 0) return;
     if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
@@ -314,7 +311,6 @@ export function handleImageFiles(newFiles) {
     });
     if (errorMessages.length > 0) { if(imageErrorDisplay) imageErrorDisplay.innerHTML = errorMessages.join('<br>'); ui.showToast('部分圖片上傳失敗。', 'error'); }
     if (validFiles.length === 0) { if(imageInput) imageInput.value = ''; return; }
-
     const fragment = document.createDocumentFragment();
     let filesToProcess = validFiles.length;
     validFiles.forEach((file) => {
@@ -325,7 +321,6 @@ export function handleImageFiles(newFiles) {
             let currentImages = state.getUploadedImages();
             currentImages.push(imageObject);
             state.setUploadedImages(currentImages);
-            
             const previewWrapper = document.createElement('div');
             previewWrapper.className = 'relative group';
             const imgElement = document.createElement('img');
@@ -349,29 +344,19 @@ export function handleImageFiles(newFiles) {
     });
     if(imageInput) imageInput.value = '';
 }
-
-/**
- * 匯出題庫檔案
- */
 export async function exportFile() {
     const questions = state.getGeneratedQuestions();
     const format = formatSelect ? formatSelect.value : '';
     if (!format) return ui.showToast('請選擇匯出檔案格式！', 'error');
     if (!questions || questions.length === 0) return ui.showToast('沒有可匯出的題目！', 'error');
-    
     let data, filename, success = false;
     try {
         ui.showLoader('正在準備匯出檔案...');
-        
-        // 【最終修正】改用與 pdf.js 相同的 loadScript 方式載入
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
         const XLSX = window.XLSX;
-
-        // 增加一個健全性檢查
         if (!XLSX) {
             throw new Error('XLSX library failed to load on window object.');
         }
-
         const standardMCQs = questions.map(q => q.hasOwnProperty('is_correct') ? { text: q.text, options: ['是', '否'], correct: [q.is_correct ? 0 : 1], time: 30, explanation: q.explanation || '' } : q);
         switch (format) {
             case 'wordwall':
@@ -399,17 +384,14 @@ export async function exportFile() {
                 break;
             default: throw new Error('未知的格式');
         }
-
         if(data) {
             const worksheet = XLSX.utils.json_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
             XLSX.writeFile(workbook, filename);
             success = true;
         }
-        
         if (success) {
             ui.showPostDownloadModal();
         }
-
     } catch (error) { 
         console.error('匯出失敗:', error); 
         ui.showToast('匯出失敗，請檢查主控台錯誤。', 'error'); 
@@ -417,13 +399,11 @@ export async function exportFile() {
         ui.hideLoader();
     }
 }
-
 export async function copyContentToClipboard() {
     const textToCopy = textInput ? textInput.value : '';
     if (!textToCopy.trim()) { ui.showToast('沒有內容可以複製！', 'error'); return; }
     try { await navigator.clipboard.writeText(textToCopy); ui.showToast('文章內容已成功複製！', 'success'); } catch (err) { console.error('複製失敗:', err); ui.showToast('無法複製內容。', 'error'); }
 }
-
 export function clearAllInputs() {
     if(textInput) textInput.value = ''; 
     if(fileInput) fileInput.value = ''; 

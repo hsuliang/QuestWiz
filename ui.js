@@ -269,13 +269,22 @@ export function applyThemePreference() {
 export function populateVersionHistory() {
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v7.9 安全性強化';
+    const currentDisplayVersion = 'v8.0 功能增強';
     if (versionBtn) versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v7.9 安全性強化",
+            version: "v8.0 功能增強",
             current: true,
+            notes: [
+                "【✨ 功能增強】",
+                " - 新增 AI 生成內容的「文本類型」自訂選項。",
+                " - 新增 AI 生成內容的「寫作語氣」自訂選項。",
+                " - 讓使用者可輸入預設選項外的指令，提升提示詞的彈性與控制力。"
+            ]
+        },
+        {
+            version: "v7.9 安全性強化",
             notes: [
                 "【🔒 安全性強化】",
                 " - API 金鑰傳輸方式升級，從 URL 參數移至 HTTP 標頭 (Header) 傳送。",
@@ -291,27 +300,6 @@ export function populateVersionHistory() {
                 " - 新增 API 金鑰 2 小時有效期限，到期後需重新輸入。",
                 " - 新增 API 金鑰有效時間倒數計時器。",
                 " - 新增 API 金鑰設定區塊的安全提示文字。",
-            ]
-        },
-        {
-            version: "v7.7 專家升級",
-            notes: [
-                "【✨ AI 核心升級】",
-                " - 植入專業的「素養導向評量核心設計指南」作為 AI 出題時的最高指導原則，大幅提升素養導向題目的深度與品質。"
-            ]
-        },
-        {
-            version: "v7.6 智慧說明",
-            notes: [
-                "【✨ 功能升級】",
-                " - 新增智慧邏輯：當匯出格式切換至需要「答題說明」的 Wayground 或 LoiLoNote 時，若現有題目無說明，將自動觸發 AI 重新生成以補齊內容。"
-            ]
-        },
-        {
-            version: "v7.5 介面優化",
-            notes: [
-                "【✨ UI/UX 優化】",
-                " - 新增「常用設定」區塊的收合功能，並能記憶狀態，節省畫面空間。",
             ]
         },
     ];
