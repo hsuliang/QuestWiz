@@ -21,6 +21,9 @@ const questionStyleSelect = document.getElementById('question-style-select');
 const previewActions = document.getElementById('preview-actions');
 const regenerateBtn = document.getElementById('regenerate-btn');
 const textInput = document.getElementById('text-input');
+const previewLoader = document.getElementById('preview-loader');
+const loadingText = document.getElementById('loading-text');
+
 
 /**
  * 顯示提示訊息 (Toast)
@@ -360,4 +363,24 @@ export function askForLanguageChoice() {
         langChoiceZhBtn.addEventListener('click', handleChoice, { once: true });
         langChoiceEnBtn.addEventListener('click', handleChoice, { once: true });
     });
+}
+
+/**
+ * 顯示載入中提示
+ * @param {string} text - 要顯示的文字
+ */
+export function showLoader(text = '處理中...') {
+    if (previewLoader && loadingText) {
+        loadingText.textContent = text;
+        previewLoader.classList.remove('hidden');
+    }
+}
+
+/**
+ * 隱藏載入中提示
+ */
+export function hideLoader() {
+    if (previewLoader) {
+        previewLoader.classList.add('hidden');
+    }
 }

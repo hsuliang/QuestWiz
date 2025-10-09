@@ -29,6 +29,25 @@ const previewPlaceholder = document.getElementById('preview-placeholder');
 const questionsContainer = document.getElementById('questions-container');
 const previewActions = document.getElementById('preview-actions');
 
+/**
+ * 輔助函式：動態載入一個 script
+ * @param {string} src - script 的 URL
+ * @returns {Promise<void>}
+ */
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        // 如果 script 已經存在，就直接 resolve
+        if (document.querySelector(`script[src="${src}"]`)) {
+            return resolve();
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`無法載入 script: ${src}`));
+        document.body.appendChild(script);
+    });
+}
+
 
 /**
  * 根據主題生成學習內文
@@ -235,14 +254,34 @@ export function handleFile(file) {
     if (file.type === 'application/pdf') {
         reader.onload = async (e) => {
             try {
+                ui.showLoader('正在讀取 PDF 檔案...');
+                // 改用手動建立 script 標籤的方式動態載入
+                await loadScript(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js`);
+                
+                // 載入成功後，pdfjsLib 會存在於 window 物件上
+                const pdfjsLib = window.pdfjsLib;
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+                
                 const pdf = await pdfjsLib.getDocument(new Uint8Array(e.target.result)).promise;
                 let text = '';
-                for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const content = await page.getTextContent(); text += content.items.map(item => item.str).join(' '); }
+                for (let i = 1; i <= pdf.numPages; i++) { 
+                    const page = await pdf.getPage(i); 
+                    const content = await page.getTextContent(); 
+                    text += content.items.map(item => item.str).join(' '); 
+                }
                 if(textInput) textInput.value = text; 
                 ui.showToast('PDF 讀取成功！', 'success'); 
                 if(tabText) tabText.click(); 
                 triggerOrUpdate();
-            } catch (error) { const errorMsg = "無法讀取此PDF。"; ui.showToast(errorMsg, "error"); if(fileErrorDisplay) fileErrorDisplay.textContent = errorMsg; if(fileNameDisplay) fileNameDisplay.textContent = ''; }
+            } catch (error) { 
+                console.error("PDF 讀取失敗:", error);
+                const errorMsg = "無法讀取此PDF，函式庫可能載入失敗。"; 
+                ui.showToast(errorMsg, "error"); 
+                if(fileErrorDisplay) fileErrorDisplay.textContent = errorMsg; 
+                if(fileNameDisplay) fileNameDisplay.textContent = ''; 
+            } finally {
+                ui.hideLoader();
+            }
         };
         reader.readAsArrayBuffer(file);
     } else {
@@ -307,7 +346,7 @@ export function handleImageFiles(newFiles) {
 /**
  * 匯出題庫檔案
  */
-export function exportFile() {
+export async function exportFile() {
     const questions = state.getGeneratedQuestions();
     const format = formatSelect ? formatSelect.value : '';
     if (!format) return ui.showToast('請選擇匯出檔案格式！', 'error');
@@ -315,6 +354,17 @@ export function exportFile() {
     
     let data, filename, success = false;
     try {
+        ui.showLoader('正在準備匯出檔案...');
+        
+        // 【最終修正】改用與 pdf.js 相同的 loadScript 方式載入
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        const XLSX = window.XLSX;
+
+        // 增加一個健全性檢查
+        if (!XLSX) {
+            throw new Error('XLSX library failed to load on window object.');
+        }
+
         const standardMCQs = questions.map(q => q.hasOwnProperty('is_correct') ? { text: q.text, options: ['是', '否'], correct: [q.is_correct ? 0 : 1], time: 30, explanation: q.explanation || '' } : q);
         switch (format) {
             case 'wordwall':
@@ -356,6 +406,8 @@ export function exportFile() {
     } catch (error) { 
         console.error('匯出失敗:', error); 
         ui.showToast('匯出失敗，請檢查主控台錯誤。', 'error'); 
+    } finally {
+        ui.hideLoader();
     }
 }
 
