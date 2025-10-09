@@ -6,6 +6,8 @@
     <title>ㄚ亮笑長的題目生成器</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link rel="icon" type="image/jpeg" href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIbGNtcwIQAABtbnRyUkdCIFhZWiAH4gADABQACQAOAB1hYCNzcTVNGVAAAAABzYXdzYCNybAAAAAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWhhbmRhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkZXNjAAAAAAAAAB5jcmVhdGVkIGJ5IHNhd3NjcHRybCBU29sa2l0LiAyLjMAAAAADGN1cnYAAAAAAAAEAAAAAAUACgAPABQAGQAeACMAKAAtADIANwA7AEAARQBKAE8AVABZAF4AYwBoAG0AcgB3AHwAgQCGAIsAkACVAJoAnwCkAKkArgCyALcAvADBAMYAywDQANUA2wDgAOUA6wDwAPYA+wEBAQcBDQETARkBHwElASsBMgE4AT4BRQFMAVIBWQFgAWcBbgF3AXwBgwGLAZwBqQG1AcEByQHRAdkB4QHpAfIB+gIDAgwCFAIdAiYCLwI cuartoAkECSwJUAl0CYwJtAoACjwKgArQCsAK2AsgC3gLwAwYDIwMmMzkDWwNzA3oDhQOLA5YDogOuA7oDxwPTA+AD7AP5BAYEEwQgBC0EOwRIBFUEYwRxBH4EjASaBKgEtgTEBNME4QTwBP4FDQUcBSsFOgVJBVgFZwV3BYYFlgWmBbUFxQXVBeUF9gYGBhYGJwY3BkgGWQZqBnsGjAadBq8GwAbRBuMG9QcHBxkHKwc9B0EHYQd0B4YHmQesB78H0gflB/gICwgfCDIIRghaCG4IggiWCKoIvgjSCOcI+wkQCSUJOglPCWQJeQmPCaQJugnPCeUJ+woRCicKPQpUCmoKgQqYCq4KxQrcCvMLCwsiCzkLUQtpC4ALmAuwC8gL4Qv5DBIMKgxDDFwMdQyODKcMwAzZDPMNDQ0mDUANWg10DY4NqQ3DDd4N+A4TDi4OSQ5kDn8Omw62DtIO7g8JDyUPQQ9eD3oPlg+zD88P7BAJECYQQxBhEH4QmxC5ENcQ9RETETERTxFtEYwRqhHJEfASDxMlE0gTow Wilhelmina Triesenberg">
     
@@ -216,26 +218,26 @@
                             </div>
                             <div>
                                 <label for="format-select" class="block text-sm font-medium text-gray-700">匯出格式：</label>
-                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
                                     <option value="" disabled selected>請選擇...</option>
                                     <option value="wordwall">Wordwall</option> <option value="kahoot">Kahoot!</option> <option value="wayground">Wayground</option> <option value="loilonote">LoiLoNote</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="question-type-select" class="block text-sm font-medium text-gray-700">題目類型：</label>
-                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
                                     <option value="multiple_choice" selected>選擇題</option> <option value="true_false">是非題</option> <option value="mixed">是非+選擇題</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="difficulty-select" class="block text-sm font-medium text-gray-700">題目難度：</label>
-                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
                                     <option value="中等" selected>中等 (預設)</option> <option value="簡單">簡單</option> <option value="困難">困難</option>
                                 </select>
                             </div>
                             <div class="sm:col-span-2">
                                 <label for="question-style-select" class="block text-sm font-medium text-gray-700">出題風格：</label>
-                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[50px]">
                                     <option value="knowledge-recall" selected>知識記憶型 (預設)</option> <option value="competency-based">✨ 素養導向型</option>
                                 </select>
                             </div>

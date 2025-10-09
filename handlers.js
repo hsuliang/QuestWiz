@@ -69,7 +69,7 @@ export async function generateContentFromTopic() {
     try {
         const studentLevel = studentLevelSelect.value;
         const isCompetencyBased = competencyBasedCheckbox.checked;
-        const apiUrl = `${CONFIG.API_URL}${apiKey}`;
+        const apiUrl = CONFIG.API_URL; // 【修改】URL 不再拼接 API Key
         const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
         const wordCount = wordCountMap[studentLevel];
         const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
@@ -89,7 +89,14 @@ export async function generateContentFromTopic() {
             }
         };
 
-        const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+        const response = await fetch(apiUrl, { 
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey // 【修改】在此處加入 API Key 標頭
+            }, 
+            body: JSON.stringify(requestBody) 
+        });
         
         if (!response.ok) {
              const errorBody = await response.json().catch(() => ({ error: { message: '無法讀取錯誤內容' } }));

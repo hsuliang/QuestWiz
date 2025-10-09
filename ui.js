@@ -21,9 +21,6 @@ const questionStyleSelect = document.getElementById('question-style-select');
 const previewActions = document.getElementById('preview-actions');
 const regenerateBtn = document.getElementById('regenerate-btn');
 const textInput = document.getElementById('text-input');
-const previewLoader = document.getElementById('preview-loader');
-const loadingText = document.getElementById('loading-text');
-
 
 /**
  * 顯示提示訊息 (Toast)
@@ -272,21 +269,28 @@ export function applyThemePreference() {
 export function populateVersionHistory() {
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v7.8 安全更新';
+    const currentDisplayVersion = 'v7.9 安全性強化';
     if (versionBtn) versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v7.8 安全更新",
+            version: "v7.9 安全性強化",
             current: true,
+            notes: [
+                "【🔒 安全性強化】",
+                " - API 金鑰傳輸方式升級，從 URL 參數移至 HTTP 標頭 (Header) 傳送。",
+                " - 採用 Google API 標準的 `x-goog-api-key` 標頭，提升傳輸過程的安全性。",
+                " - 有效避免金鑰在伺服器日誌、瀏覽器歷史紀錄中意外洩漏的風險。"
+            ]
+        },
+        {
+            version: "v7.8 安全更新",
             notes: [
                 "【✨ 安全性升級】",
                 " - API 金鑰儲存方式從 localStorage 改為 sessionStorage，關閉分頁後自動清除。",
                 " - 新增 API 金鑰 2 小時有效期限，到期後需重新輸入。",
                 " - 新增 API 金鑰有效時間倒數計時器。",
                 " - 新增 API 金鑰設定區塊的安全提示文字。",
-                " - 優化頁面載入效能",
-                " - 解決503錯誤",
             ]
         },
         {
@@ -372,6 +376,8 @@ export function askForLanguageChoice() {
  * @param {string} text - 要顯示的文字
  */
 export function showLoader(text = '處理中...') {
+    const previewLoader = document.getElementById('preview-loader');
+    const loadingText = document.getElementById('loading-text');
     if (previewLoader && loadingText) {
         loadingText.textContent = text;
         previewLoader.classList.remove('hidden');
@@ -382,6 +388,7 @@ export function showLoader(text = '處理中...') {
  * 隱藏載入中提示
  */
 export function hideLoader() {
+    const previewLoader = document.getElementById('preview-loader');
     if (previewLoader) {
         previewLoader.classList.add('hidden');
     }

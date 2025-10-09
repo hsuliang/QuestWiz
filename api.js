@@ -8,7 +8,7 @@ const formatSelect = document.getElementById('format-select');
  * 新增：帶有重試機制的 Fetch 函式
  * @param {string} url - 請求的 URL
  * @param {object} options - Fetch 的設定選項
- * @param {number} retries - 最大重試次數
+ * @param {number} retries - 最大重試次数
  * @param {number} delay - 初始延遲時間 (毫秒)
  * @returns {Promise<Response>}
  */
@@ -61,7 +61,7 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key not available.");
 
-    const apiUrl = `${CONFIG.API_URL}${apiKey}`;
+    const apiUrl = CONFIG.API_URL; // 【修改】URL 不再拼接 API Key
     const selectedFormat = formatSelect ? formatSelect.value : '';
     const needsExplanation = selectedFormat === 'loilonote' || selectedFormat === 'wayground';
 
@@ -142,7 +142,10 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
     // 使用帶有重試機制的 fetch 函式
     const response = await fetchWithRetry(apiUrl, { 
         method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
+        headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey // 【修改】在此處加入 API Key 標頭
+        }, 
         body: JSON.stringify(payload), 
         signal 
     });
