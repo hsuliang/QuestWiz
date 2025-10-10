@@ -12,13 +12,14 @@ const fileErrorDisplay = document.getElementById('file-error-display');
 const imageInput = document.getElementById('image-input');
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imageErrorDisplay = document.getElementById('image-error-display');
+const urlInput = document.getElementById('url-input');
+const urlTypeWebRadio = document.getElementById('url-type-web');
 const numQuestionsInput = document.getElementById('num-questions');
 const formatSelect = document.getElementById('format-select');
 const questionTypeSelect = document.getElementById('question-type-select');
 const difficultySelect = document.getElementById('difficulty-select');
-const copyContentBtn = document.getElementById('copy-content-btn');
 const downloadTxtBtn = document.getElementById('download-txt-btn');
-const downloadPdfBtn = document.getElementById('download-pdf-btn');
+const shareContentBtn = document.getElementById('share-content-btn');
 const questionStyleSelect = document.getElementById('question-style-select');
 const studentLevelSelect = document.getElementById('student-level-select');
 const tabImage = document.getElementById('tab-image');
@@ -151,6 +152,7 @@ export async function callGeminiForContent(promptString) {
             textInput.value = generatedText;
             ui.showToast('學習內文已成功生成！', 'success');
             if (downloadTxtBtn) downloadTxtBtn.classList.remove('hidden');
+            if (shareContentBtn) shareContentBtn.classList.remove('hidden');
             if (tabText) tabText.click();
             if (competencyBasedCheckbox) competencyBasedCheckbox.checked = true;
             if (questionStyleSelect) questionStyleSelect.value = 'competency-based';
@@ -239,8 +241,132 @@ export function handleDownloadTxt() {
 }
 
 /**
- * 8. 其餘既有函式
+ * 8. 處理分享內容的函式
  */
+export async function handleShareContent() {
+    const textToShare = textInput.value;
+    if (!textToShare.trim()) {
+        return ui.showToast('沒有內容可以分享！', 'error');
+    }
+
+    ui.showLoader('正在產生分享連結...');
+    try {
+        const response = await fetch(CONFIG.ADD_CONTENT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textToShare }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`建立分享連結失敗: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const contentId = result.id;
+
+        const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+        const shareUrl = `${baseUrl}${CONFIG.VIEW_PAGE_URL}?id=${contentId}`;
+        
+        const shareLinkInput = document.getElementById('share-link-input');
+        if (shareLinkInput) {
+            shareLinkInput.value = shareUrl;
+        }
+
+        const qrCodeContainer = document.getElementById('qr-code-container');
+        if (qrCodeContainer) {
+            qrCodeContainer.innerHTML = '';
+            await loadScript('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js');
+            new QRCode(qrCodeContainer, {
+                text: shareUrl,
+                width: 180,
+                height: 180,
+            });
+        }
+        
+        ui.showShareModal();
+
+    } catch (error) {
+        console.error('分享失敗:', error);
+        ui.showToast('分享失敗，請檢查後端服務或網路連線。', 'error');
+    } finally {
+        ui.hideLoader();
+    }
+}
+
+/**
+ * 9. 處理複製分享連結的函式
+ */
+export function handleCopyLink() {
+    const shareLinkInput = document.getElementById('share-link-input');
+    if (shareLinkInput && shareLinkInput.value) {
+        navigator.clipboard.writeText(shareLinkInput.value)
+            .then(() => ui.showToast('連結已成功複製！', 'success'))
+            .catch(() => ui.showToast('複製失敗。', 'error'));
+    }
+}
+
+/**
+ * 10. 處理從 URL 擷取內容的函式
+ */
+export async function handleExtractFromUrl() {
+    const url = urlInput ? urlInput.value.trim() : '';
+    const isYouTube = urlTypeWebRadio ? !urlTypeWebRadio.checked : false;
+    
+    if (!url) {
+        return ui.showToast('請輸入網址！', 'error');
+    }
+    
+    try {
+        new URL(url);
+    } catch (_) {
+        return ui.showToast('網址格式不正確！', 'error');
+    }
+
+    const endpoint = isYouTube ? CONFIG.GET_YOUTUBE_TRANSCRIPT_URL : CONFIG.EXTRACT_URL_FUNCTION_URL;
+    const loaderText = isYouTube ? '正在擷取 YouTube 字幕...' : '正在擷取網頁內容...';
+    
+    ui.showLoader(loaderText);
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: '無法解析錯誤訊息' }));
+            throw new Error(errorData.error || `擷取失敗: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        let fullText;
+        if (isYouTube) {
+            fullText = result.transcript;
+        } else {
+            fullText = `標題：${result.title}\n\n內文：\n${result.content}`;
+        }
+        
+        textInput.value = fullText;
+        ui.showToast('內容擷取成功！', 'success');
+        
+        const tabText = document.getElementById('tab-text');
+        if (tabText) tabText.click();
+
+        if (downloadTxtBtn) downloadTxtBtn.classList.remove('hidden');
+        if (shareContentBtn) shareContentBtn.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('擷取內容失敗:', error);
+        ui.showToast(error.message, 'error');
+    } finally {
+        ui.hideLoader();
+    }
+}
+
+
+// --- 其餘既有函式 ---
+
 export function triggerOrUpdate() {
     if (isAutoGenerateEnabled()) {
         debouncedGenerate();
@@ -492,9 +618,11 @@ export function clearAllInputs() {
     if(imageInput) imageInput.value = ''; 
     if(imagePreviewContainer) imagePreviewContainer.innerHTML = ''; 
     if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
+    if(urlInput) urlInput.value = '';
     state.setUploadedImages([]);
     
     if(downloadTxtBtn) downloadTxtBtn.classList.add('hidden');
+    if(shareContentBtn) shareContentBtn.classList.add('hidden');
     
     if(topicInput) topicInput.value = ''; 
     if(textTypeSelect) textTypeSelect.value = '科普說明文';

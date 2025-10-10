@@ -21,6 +21,7 @@ const clearAndNewBtn = document.getElementById('clear-and-new-btn');
 const questionTypeSelect = document.getElementById('question-type-select');
 const difficultySelect = document.getElementById('difficulty-select');
 const downloadTxtBtn = document.getElementById('download-txt-btn');
+const shareContentBtn = document.getElementById('share-content-btn');
 const clearContentBtn = document.getElementById('clear-content-btn');
 const questionStyleSelect = document.getElementById('question-style-select');
 const studentLevelSelect = document.getElementById('student-level-select');
@@ -38,17 +39,20 @@ const settingsTabs = {
 };
 const tabText = document.getElementById('tab-text');
 const tabImage = document.getElementById('tab-image');
+const tabUrl = document.getElementById('tab-url');
 const tabAi = document.getElementById('tab-ai');
 const contentText = document.getElementById('content-text');
 const contentImage = document.getElementById('content-image');
+const contentUrl = document.getElementById('content-url');
 const contentAi = document.getElementById('content-ai');
 const generateContentBtn = document.getElementById('generate-content-btn');
+const extractFromUrlBtn = document.getElementById('extract-from-url-btn');
 const generateFromImagesBtn = document.getElementById('generate-from-images-btn');
 const downloadBtn = document.getElementById('download-btn');
 const regenerateBtn = document.getElementById('regenerate-btn');
 const imageDropZone = document.getElementById('image-drop-zone');
-const inputTabs = [tabText, tabImage, tabAi];
-const inputContents = [contentText, contentImage, contentAi];
+const inputTabs = [tabText, tabImage, tabUrl, tabAi];
+const inputContents = [contentText, contentImage, contentUrl, contentAi];
 const controls = [textInput, numQuestionsInput, questionTypeSelect, difficultySelect, questionStyleSelect, studentLevelSelect];
 
 const textTypeSelect_custom = document.getElementById('text-type-select');
@@ -61,6 +65,10 @@ const promptModal = document.getElementById('prompt-modal');
 const closePromptModalBtn = document.getElementById('close-prompt-modal-btn');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
 const generateWithEditedPromptBtn = document.getElementById('generate-with-edited-prompt-btn');
+
+const shareModal = document.getElementById('share-modal');
+const closeShareModalBtn = document.getElementById('close-share-modal-btn');
+const copyLinkBtn = document.getElementById('copy-link-btn');
 
 
 // --- 事件監聽器與初始化 ---
@@ -95,7 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 綁定所有事件監聽器 ---
     utils.addSafeEventListener(generateContentBtn, 'click', handlers.generateContentFromTopic, 'generateContentBtn');
+    utils.addSafeEventListener(extractFromUrlBtn, 'click', handlers.handleExtractFromUrl, 'extractFromUrlBtn');
     utils.addSafeEventListener(downloadTxtBtn, 'click', handlers.handleDownloadTxt, 'downloadTxtBtn');
+    utils.addSafeEventListener(shareContentBtn, 'click', handlers.handleShareContent, 'shareContentBtn');
     utils.addSafeEventListener(clearContentBtn, 'click', handlers.clearAllInputs, 'clearContentBtn');
     utils.addSafeEventListener(downloadBtn, 'click', handlers.exportFile, 'downloadBtn');
     utils.addSafeEventListener(regenerateBtn, 'click', handlers.triggerQuestionGeneration, 'regenerateBtn');
@@ -107,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     utils.addSafeEventListener(textInput, 'input', () => {
         const hasText = textInput.value.trim() !== '';
         downloadTxtBtn.classList.toggle('hidden', !hasText);
+        shareContentBtn.classList.toggle('hidden', !hasText);
         ui.updateRegenerateButtonState();
     }, 'textInput');
 
@@ -131,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (apiKeyInput) {
             const key = apiKeyInput.value.trim();
             if (key) {
-                const expirationTime = new Date().getTime() + (2 * 60 * 60 * 1000); // 2 小時
+                const expirationTime = new Date().getTime() + (2 * 60 * 60 * 1000);
                 const keyData = { value: key, expires: expirationTime };
                 sessionStorage.setItem('gemini_api_key_data', JSON.stringify(keyData));
                 ui.showToast('API Key 已儲存！有效期限 2 小時。', 'success');
@@ -255,4 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
     utils.addSafeEventListener(promptModal, 'click', (e) => { if (e.target === promptModal) ui.hidePromptModal(); }, 'promptModal');
     utils.addSafeEventListener(copyPromptBtn, 'click', handlers.handleCopyPrompt, 'copyPromptBtn');
     utils.addSafeEventListener(generateWithEditedPromptBtn, 'click', handlers.handleGenerateWithEditedPrompt, 'generateWithEditedPromptBtn');
+
+    // Share Modal 事件監聽器
+    utils.addSafeEventListener(closeShareModalBtn, 'click', ui.hideShareModal, 'closeShareModalBtn');
+    utils.addSafeEventListener(shareModal, 'click', (e) => { if (e.target === shareModal) ui.hideShareModal(); }, 'shareModal');
+    utils.addSafeEventListener(copyLinkBtn, 'click', handlers.handleCopyLink, 'copyLinkBtn');
 });

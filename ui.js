@@ -21,7 +21,8 @@ const questionStyleSelect = document.getElementById('question-style-select');
 const previewActions = document.getElementById('preview-actions');
 const regenerateBtn = document.getElementById('regenerate-btn');
 const textInput = document.getElementById('text-input');
-const promptModal = document.getElementById('prompt-modal'); // 【新增】
+const promptModal = document.getElementById('prompt-modal');
+const shareModal = document.getElementById('share-modal');
 
 /**
  * 顯示提示訊息 (Toast)
@@ -270,18 +271,34 @@ export function applyThemePreference() {
 export function populateVersionHistory() {
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.0 功能增強';
+    const currentDisplayVersion = 'v8.2 內容擴充';
     if (versionBtn) versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.0 功能增強",
+            version: "v8.2 內容擴充",
             current: true,
             notes: [
+                "【🚀 新功能】",
+                " - 新增「從網址匯入」功能，可自動擷取網頁文章或 YouTube 影片字幕。",
+                " - 支援貼上新聞、部落格、YouTube 影片連結，擴大內容來源。",
+                " - 此功能需搭配後端的 `extractContentFromUrl` 與 `getYouTubeTranscript` 雲端函式使用。"
+            ]
+        },
+        {
+            version: "v8.1 內容分享",
+            notes: [
+                "【🚀 新功能】",
+                " - 新增「分享內容」功能，可產生臨時閱讀頁面的 QR Code 與連結。",
+                " - 方便教師在課堂上快速將 AI 生成的內容派發給學生閱讀。",
+            ]
+        },
+        {
+            version: "v8.0 功能增強",
+            notes: [
                 "【✨ 功能增強】",
-                " - 新增 AI 生成內容的「文本類型」自訂選項。",
-                " - 新增 AI 生成內容的「寫作語氣」自訂選項。",
-                " - 讓使用者可輸入預設選項外的指令，提升提示詞的彈性與控制力。"
+                " - 新增 AI 生成內容的「文本類型」與「寫作語氣」的自訂選項。",
+                " - 新增「預覽/修改提示詞」功能，讓使用者能完全控制 AI 指令。",
             ]
         },
         {
@@ -289,14 +306,13 @@ export function populateVersionHistory() {
             notes: [
                 "【🔒 安全性強化】",
                 " - API 金鑰傳輸方式升級，從 URL 參數移至 HTTP 標頭 (Header) 傳送。",
-                " - 採用 Google API 標準的 `x-goog-api-key` 標頭，提升傳輸過程的安全性。",
             ]
         },
         {
             version: "v7.8 安全更新",
             notes: [
                 "【✨ 安全性升級】",
-                " - API 金鑰儲存方式從 localStorage 改為 sessionStorage，關閉分頁後自動清除。",
+                " - API 金鑰儲存方式從 localStorage 改為 sessionStorage。",
                 " - 新增 API 金鑰 2 小時有效期限與倒數計時器。",
             ]
         },
@@ -369,10 +385,16 @@ export function hideLoader() {
     }
 }
 
-// 【新增】控制 Prompt Modal 顯示/隱藏的函式
 export function showPromptModal() {
     if (promptModal) promptModal.classList.remove('hidden');
 }
 export function hidePromptModal() {
     if (promptModal) promptModal.classList.add('hidden');
+}
+
+export function showShareModal() {
+    if (shareModal) shareModal.classList.remove('hidden');
+}
+export function hideShareModal() {
+    if (shareModal) shareModal.classList.add('hidden');
 }
