@@ -17,6 +17,8 @@ const formatSelect = document.getElementById('format-select');
 const questionTypeSelect = document.getElementById('question-type-select');
 const difficultySelect = document.getElementById('difficulty-select');
 const copyContentBtn = document.getElementById('copy-content-btn');
+const downloadTxtBtn = document.getElementById('download-txt-btn');
+const downloadPdfBtn = document.getElementById('download-pdf-btn');
 const questionStyleSelect = document.getElementById('question-style-select');
 const studentLevelSelect = document.getElementById('student-level-select');
 const tabImage = document.getElementById('tab-image');
@@ -33,6 +35,7 @@ const loadingText = document.getElementById('loading-text');
 const previewPlaceholder = document.getElementById('preview-placeholder');
 const questionsContainer = document.getElementById('questions-container');
 const previewActions = document.getElementById('preview-actions');
+const promptDisplayArea = document.getElementById('prompt-display-area');
 
 /**
  * 輔助函式：動態載入一個 script
@@ -52,46 +55,38 @@ function loadScript(src) {
     });
 }
 
+// --- AI 生成內容相關函式 ---
 
 /**
- * 根據主題生成學習內文
+ * 1. 組合 AI 內容生成的提示詞 (Prompt)
+ * @returns {string|null} - 組合好的提示詞字串，如果輸入無效則回傳 null
  */
-export async function generateContentFromTopic() {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
-    }
-
-    if (!topicInput || !previewLoader) return;
-
+export function buildContentPrompt() {
     const topic = topicInput.value;
     if (!topic.trim()) {
-        return ui.showToast('請輸入一個主題、單字或語詞！', 'error');
+        ui.showToast('請輸入一個主題、單字或語詞！', 'error');
+        return null;
     }
-    
-    // 【修改】智慧取值與空值檢查
+
     const textType = textTypeSelect.value === 'custom' ? customTextTypeInput.value.trim() : textTypeSelect.value;
     const tone = toneSelect.value === 'custom' ? customToneInput.value.trim() : toneSelect.value;
 
     if ((textTypeSelect.value === 'custom' && !textType) || (toneSelect.value === 'custom' && !tone)) {
-        return ui.showToast('「自訂」選項的內容不能為空！', 'error');
+        ui.showToast('「自訂」選項的內容不能為空！', 'error');
+        return null;
     }
-
-    ui.showLoader('AI 作家生成中...');
     
-    try {
-        const studentLevel = studentLevelSelect.value;
-        const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
-        const learningObjectives = learningObjectivesInput.value;
-        const apiUrl = CONFIG.API_URL;
-        const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
-        const wordCount = wordCountMap[studentLevel];
-        
-        const topicSection = learningObjectives.trim()
-            ? `文章的核心主題是「${topic}」，並且必須清晰地圍繞以下核心學習目標或關鍵詞彙來撰寫：\n${learningObjectives}`
-            : `文章的核心主題是「${topic}」。`;
+    const studentLevel = studentLevelSelect.value;
+    const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
+    const learningObjectives = learningObjectivesInput.value;
+    const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
+    const wordCount = wordCountMap[studentLevel];
+    
+    const topicSection = learningObjectives.trim()
+        ? `文章的核心主題是「${topic}」，並且必須清晰地圍繞以下核心學習目標或關鍵詞彙來撰寫：\n${learningObjectives}`
+        : `文章的核心主題是「${topic}」。`;
 
-        const systemInstructionText = `
+    return `
 P (Persona):
 你是一位專為「${studentGradeText}」學生編寫教材的頂尖「${textType}」設計專家與作者。
 
@@ -110,18 +105,32 @@ S (Structure):
 2. 寫作語氣：必須是「${tone}」。
 3. 文章結構：請為文章加上一個吸引人的標題，並將內容分成數個段落以便閱讀。
 4. 最終產出：直接提供完整的文章內容，不要包含任何額外的說明或開場白。
-        `;
-        
+    `;
+}
+
+/**
+ * 2. 呼叫 Gemini API 請求生成內容
+ * @param {string} promptString - 完整的提示詞
+ */
+export async function callGeminiForContent(promptString) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
+    }
+
+    ui.showLoader('AI 作家生成中...');
+    
+    try {
         const requestBody = {
             "contents": [{
-                "parts": [{ "text": `主題：${topic}` }]
+                "parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }]
             }],
             "systemInstruction": {
-                "parts": [{ "text": systemInstructionText }]
+                "parts": [{ "text": promptString }]
             }
         };
 
-        const response = await fetchWithRetry(apiUrl, { 
+        const response = await fetchWithRetry(CONFIG.API_URL, { 
             method: 'POST', 
             headers: { 
                 'Content-Type': 'application/json',
@@ -141,12 +150,10 @@ S (Structure):
         if (generatedText) {
             textInput.value = generatedText;
             ui.showToast('學習內文已成功生成！', 'success');
-            if (copyContentBtn) copyContentBtn.classList.remove('hidden');
+            if (downloadTxtBtn) downloadTxtBtn.classList.remove('hidden');
             if (tabText) tabText.click();
-            if (document.getElementById('competency-based-checkbox')) {
-                document.getElementById('competency-based-checkbox').checked = true;
-            }
-            if (questionStyleSelect) { questionStyleSelect.value = 'competency-based'; }
+            if (competencyBasedCheckbox) competencyBasedCheckbox.checked = true;
+            if (questionStyleSelect) questionStyleSelect.value = 'competency-based';
             triggerOrUpdate();
         } else { 
             throw new Error('AI未能生成內容，請檢查您的 API Key 或稍後再試。'); 
@@ -159,9 +166,81 @@ S (Structure):
     }
 }
 
-// ... (檔案中其餘的函式保持不變) ...
-// (以下省略與上方修改無關的其餘程式碼，以節省篇幅)
-// ... (The rest of the functions in the file remain unchanged) ...
+/**
+ * 3. 主按鈕「生成學習內文」的處理函式 (快速生成)
+ */
+export function generateContentFromTopic() {
+    const prompt = buildContentPrompt();
+    if (prompt) {
+        callGeminiForContent(prompt);
+    }
+}
+
+/**
+ * 4. 「預覽/修改提示詞」按鈕的處理函式
+ */
+export function handlePreviewPrompt() {
+    const prompt = buildContentPrompt();
+    if (prompt && promptDisplayArea) {
+        promptDisplayArea.value = prompt.trim();
+        ui.showPromptModal();
+    }
+}
+
+/**
+ * 5. 彈出視窗中「複製提示詞」按鈕的處理函式
+ */
+export function handleCopyPrompt() {
+    if (!promptDisplayArea) return;
+    const textToCopy = promptDisplayArea.value;
+    if (!textToCopy.trim()) {
+        ui.showToast('沒有內容可以複製！', 'error');
+        return;
+    }
+    navigator.clipboard.writeText(textToCopy)
+        .then(() => ui.showToast('提示詞已成功複製！', 'success'))
+        .catch(err => {
+            console.error('複製失敗:', err);
+            ui.showToast('無法複製內容。', 'error');
+        });
+}
+
+/**
+ * 6. 彈出視窗中「以此提示詞生成內容」按鈕的處理函式
+ */
+export function handleGenerateWithEditedPrompt() {
+    if (!promptDisplayArea) return;
+    const finalPrompt = promptDisplayArea.value;
+    if (!finalPrompt.trim()) {
+        ui.showToast('提示詞內容不能為空！', 'error');
+        return;
+    }
+    ui.hidePromptModal();
+    callGeminiForContent(finalPrompt);
+}
+
+/**
+ * 7. 處理下載 .txt 檔案
+ */
+export function handleDownloadTxt() {
+    const textToSave = textInput.value;
+    if (!textToSave.trim()) {
+        return ui.showToast('沒有內容可以下載！', 'error');
+    }
+    const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'generated-content.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * 8. 其餘既有函式
+ */
 export function triggerOrUpdate() {
     if (isAutoGenerateEnabled()) {
         debouncedGenerate();
@@ -170,6 +249,7 @@ export function triggerOrUpdate() {
     }
 }
 export const debouncedGenerate = debounce(triggerQuestionGeneration, CONFIG.DEBOUNCE_DELAY);
+
 export async function triggerQuestionGeneration() {
     if (tabImage && tabImage.classList.contains('active') && state.getUploadedImages().length === 0) {
         return ui.showToast('請先上傳圖片！', 'error');
@@ -190,6 +270,7 @@ export async function triggerQuestionGeneration() {
     }
     proceedWithGeneration(languageChoice);
 }
+
 async function proceedWithGeneration(languageChoice) {
     const apiKey = getApiKey();
     if (!apiKey) {
@@ -254,6 +335,7 @@ async function proceedWithGeneration(languageChoice) {
         ui.updateRegenerateButtonState();
     }
 }
+
 export function handleFile(file) {
     if (fileErrorDisplay) fileErrorDisplay.textContent = ''; 
     if (fileNameDisplay) fileNameDisplay.textContent = ''; 
@@ -297,6 +379,7 @@ export function handleFile(file) {
         reader.readAsText(file);
     }
 }
+
 export function handleImageFiles(newFiles) {
     if (!newFiles || newFiles.length === 0) return;
     if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
@@ -344,6 +427,7 @@ export function handleImageFiles(newFiles) {
     });
     if(imageInput) imageInput.value = '';
 }
+
 export async function exportFile() {
     const questions = state.getGeneratedQuestions();
     const format = formatSelect ? formatSelect.value : '';
@@ -399,11 +483,7 @@ export async function exportFile() {
         ui.hideLoader();
     }
 }
-export async function copyContentToClipboard() {
-    const textToCopy = textInput ? textInput.value : '';
-    if (!textToCopy.trim()) { ui.showToast('沒有內容可以複製！', 'error'); return; }
-    try { await navigator.clipboard.writeText(textToCopy); ui.showToast('文章內容已成功複製！', 'success'); } catch (err) { console.error('複製失敗:', err); ui.showToast('無法複製內容。', 'error'); }
-}
+
 export function clearAllInputs() {
     if(textInput) textInput.value = ''; 
     if(fileInput) fileInput.value = ''; 
@@ -413,8 +493,23 @@ export function clearAllInputs() {
     if(imagePreviewContainer) imagePreviewContainer.innerHTML = ''; 
     if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
     state.setUploadedImages([]);
-    if(copyContentBtn) copyContentBtn.classList.add('hidden'); 
+    
+    if(downloadTxtBtn) downloadTxtBtn.classList.add('hidden');
+    
     if(topicInput) topicInput.value = ''; 
+    if(textTypeSelect) textTypeSelect.value = '科普說明文';
+    if(customTextTypeInput) {
+        customTextTypeInput.value = '';
+        customTextTypeInput.classList.add('hidden');
+    }
+    if(learningObjectivesInput) learningObjectivesInput.value = '';
+    if(toneSelect) toneSelect.value = '客觀中立';
+    if(customToneInput) {
+        customToneInput.value = '';
+        customToneInput.classList.add('hidden');
+    }
+    if(competencyBasedCheckbox) competencyBasedCheckbox.checked = false;
+    
     if(questionStyleSelect) questionStyleSelect.value = 'knowledge-recall';
     state.setGeneratedQuestions([]);
     if(questionsContainer) questionsContainer.innerHTML = '';

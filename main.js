@@ -20,7 +20,7 @@ const continueEditingBtn = document.getElementById('continue-editing-btn');
 const clearAndNewBtn = document.getElementById('clear-and-new-btn');
 const questionTypeSelect = document.getElementById('question-type-select');
 const difficultySelect = document.getElementById('difficulty-select');
-const copyContentBtn = document.getElementById('copy-content-btn');
+const downloadTxtBtn = document.getElementById('download-txt-btn');
 const clearContentBtn = document.getElementById('clear-content-btn');
 const questionStyleSelect = document.getElementById('question-style-select');
 const studentLevelSelect = document.getElementById('student-level-select');
@@ -51,11 +51,17 @@ const inputTabs = [tabText, tabImage, tabAi];
 const inputContents = [contentText, contentImage, contentAi];
 const controls = [textInput, numQuestionsInput, questionTypeSelect, difficultySelect, questionStyleSelect, studentLevelSelect];
 
-// 【新增】取得自訂選項 UI 元素的參照
 const textTypeSelect_custom = document.getElementById('text-type-select');
 const customTextTypeInput = document.getElementById('custom-text-type-input');
 const toneSelect_custom = document.getElementById('tone-select');
 const customToneInput = document.getElementById('custom-tone-input');
+
+const editPromptBtn = document.getElementById('edit-prompt-btn');
+const promptModal = document.getElementById('prompt-modal');
+const closePromptModalBtn = document.getElementById('close-prompt-modal-btn');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
+const generateWithEditedPromptBtn = document.getElementById('generate-with-edited-prompt-btn');
+
 
 // --- 事件監聽器與初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -89,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 綁定所有事件監聽器 ---
     utils.addSafeEventListener(generateContentBtn, 'click', handlers.generateContentFromTopic, 'generateContentBtn');
-    utils.addSafeEventListener(copyContentBtn, 'click', handlers.copyContentToClipboard, 'copyContentBtn');
+    utils.addSafeEventListener(downloadTxtBtn, 'click', handlers.handleDownloadTxt, 'downloadTxtBtn');
     utils.addSafeEventListener(clearContentBtn, 'click', handlers.clearAllInputs, 'clearContentBtn');
     utils.addSafeEventListener(downloadBtn, 'click', handlers.exportFile, 'downloadBtn');
     utils.addSafeEventListener(regenerateBtn, 'click', handlers.triggerQuestionGeneration, 'regenerateBtn');
@@ -98,7 +104,11 @@ document.addEventListener('DOMContentLoaded', () => {
     utils.addSafeEventListener(fileInput, 'change', (event) => handlers.handleFile(event.target.files[0]), 'fileInput');
     utils.addSafeEventListener(imageInput, 'change', (event) => handlers.handleImageFiles(event.target.files), 'imageInput');
     
-    utils.addSafeEventListener(textInput, 'input', ui.updateRegenerateButtonState, 'textInput for button state');
+    utils.addSafeEventListener(textInput, 'input', () => {
+        const hasText = textInput.value.trim() !== '';
+        downloadTxtBtn.classList.toggle('hidden', !hasText);
+        ui.updateRegenerateButtonState();
+    }, 'textInput');
 
     utils.addSafeEventListener(formatSelect, 'change', () => {
         const newFormat = formatSelect.value;
@@ -154,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('quizGenAutoGenerate_v1', isEnabled);
         controls.forEach(control => {
             const eventType = control.type === 'number' || control.tagName === 'TEXTAREA' ? 'input' : 'change';
-            control.removeEventListener(eventType, handlers.debouncedGenerate); // 先移除避免重複綁定
+            control.removeEventListener(eventType, handlers.debouncedGenerate);
             if (isEnabled) {
                 utils.addSafeEventListener(control, eventType, handlers.debouncedGenerate);
             }
@@ -226,24 +236,23 @@ document.addEventListener('DOMContentLoaded', () => {
         handlers.clearAllInputs();
     }, 'clearAndNewBtn');
 
-    // 【新增】處理自訂選項顯示/隱藏的事件監聽器
+    // 自訂選項顯示/隱藏
     utils.addSafeEventListener(textTypeSelect_custom, 'change', (e) => {
         if(customTextTypeInput) {
-            if (e.target.value === 'custom') {
-                customTextTypeInput.classList.remove('hidden');
-            } else {
-                customTextTypeInput.classList.add('hidden');
-            }
+            e.target.value === 'custom' ? customTextTypeInput.classList.remove('hidden') : customTextTypeInput.classList.add('hidden');
         }
     }, 'textTypeSelect_custom');
 
     utils.addSafeEventListener(toneSelect_custom, 'change', (e) => {
         if(customToneInput) {
-            if (e.target.value === 'custom') {
-                customToneInput.classList.remove('hidden');
-            } else {
-                customToneInput.classList.add('hidden');
-            }
+            e.target.value === 'custom' ? customToneInput.classList.remove('hidden') : customToneInput.classList.add('hidden');
         }
     }, 'toneSelect_custom');
+
+    // Prompt Modal 事件監聽器
+    utils.addSafeEventListener(editPromptBtn, 'click', handlers.handlePreviewPrompt, 'editPromptBtn');
+    utils.addSafeEventListener(closePromptModalBtn, 'click', ui.hidePromptModal, 'closePromptModalBtn');
+    utils.addSafeEventListener(promptModal, 'click', (e) => { if (e.target === promptModal) ui.hidePromptModal(); }, 'promptModal');
+    utils.addSafeEventListener(copyPromptBtn, 'click', handlers.handleCopyPrompt, 'copyPromptBtn');
+    utils.addSafeEventListener(generateWithEditedPromptBtn, 'click', handlers.handleGenerateWithEditedPrompt, 'generateWithEditedPromptBtn');
 });

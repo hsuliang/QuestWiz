@@ -21,6 +21,7 @@ const questionStyleSelect = document.getElementById('question-style-select');
 const previewActions = document.getElementById('preview-actions');
 const regenerateBtn = document.getElementById('regenerate-btn');
 const textInput = document.getElementById('text-input');
+const promptModal = document.getElementById('prompt-modal'); // 【新增】
 
 /**
  * 顯示提示訊息 (Toast)
@@ -289,7 +290,6 @@ export function populateVersionHistory() {
                 "【🔒 安全性強化】",
                 " - API 金鑰傳輸方式升級，從 URL 參數移至 HTTP 標頭 (Header) 傳送。",
                 " - 採用 Google API 標準的 `x-goog-api-key` 標頭，提升傳輸過程的安全性。",
-                " - 有效避免金鑰在伺服器日誌、瀏覽器歷史紀錄中意外洩漏的風險。"
             ]
         },
         {
@@ -297,9 +297,7 @@ export function populateVersionHistory() {
             notes: [
                 "【✨ 安全性升級】",
                 " - API 金鑰儲存方式從 localStorage 改為 sessionStorage，關閉分頁後自動清除。",
-                " - 新增 API 金鑰 2 小時有效期限，到期後需重新輸入。",
-                " - 新增 API 金鑰有效時間倒數計時器。",
-                " - 新增 API 金鑰設定區塊的安全提示文字。",
+                " - 新增 API 金鑰 2 小時有效期限與倒數計時器。",
             ]
         },
     ];
@@ -328,10 +326,6 @@ export async function updateVisitorCount() {
     }
 }
 
-/**
- * 彈出視窗詢問使用者要用何種語言出題
- * @returns {Promise<string>} - 回傳 'chinese' 或 'english'
- */
 export function askForLanguageChoice() {
     return new Promise((resolve, reject) => {
         if (!languageChoiceModal || !languageChoiceModalContent) {
@@ -359,10 +353,6 @@ export function askForLanguageChoice() {
     });
 }
 
-/**
- * 顯示載入中提示
- * @param {string} text - 要顯示的文字
- */
 export function showLoader(text = '處理中...') {
     const previewLoader = document.getElementById('preview-loader');
     const loadingText = document.getElementById('loading-text');
@@ -372,12 +362,17 @@ export function showLoader(text = '處理中...') {
     }
 }
 
-/**
- * 隱藏載入中提示
- */
 export function hideLoader() {
     const previewLoader = document.getElementById('preview-loader');
     if (previewLoader) {
         previewLoader.classList.add('hidden');
     }
+}
+
+// 【新增】控制 Prompt Modal 顯示/隱藏的函式
+export function showPromptModal() {
+    if (promptModal) promptModal.classList.remove('hidden');
+}
+export function hidePromptModal() {
+    if (promptModal) promptModal.classList.add('hidden');
 }
