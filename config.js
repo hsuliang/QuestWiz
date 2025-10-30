@@ -1,5 +1,6 @@
 // --- 組態常數 ---
 export const CONFIG = {
+    // 更新為新的 v1 穩定版 API URL
     API_URL: `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent`,
     API_BATCH_SIZE: 6,
     DEBOUNCE_DELAY: 800,
