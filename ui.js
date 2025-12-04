@@ -2,33 +2,15 @@ import { getApiKey } from './api.js';
 import * as state from './state.js';
 import { triggerQuestionGeneration } from './handlers.js';
 import { isAutoGenerateEnabled } from './utils.js';
-
-// --- DOM 元素 (UI-related) ---
-const toast = document.getElementById('toast');
-const toastMessage = document.getElementById('toast-message');
-const versionHistoryContent = document.getElementById('version-history-content');
-const versionBtn = document.getElementById('version-btn');
-const postDownloadModal = document.getElementById('post-download-modal');
-const postDownloadModalContent = document.getElementById('post-download-modal-content');
-const languageChoiceModal = document.getElementById('language-choice-modal');
-const languageChoiceModalContent = document.getElementById('language-choice-modal-content');
-const langChoiceZhBtn = document.getElementById('lang-choice-zh-btn');
-const langChoiceEnBtn = document.getElementById('lang-choice-en-btn');
-const mainContainer = document.getElementById('main-container');
-const previewPlaceholder = document.getElementById('preview-placeholder');
-const questionsContainer = document.getElementById('questions-container');
-const questionStyleSelect = document.getElementById('question-style-select');
-const previewActions = document.getElementById('preview-actions');
-const regenerateBtn = document.getElementById('regenerate-btn');
-const textInput = document.getElementById('text-input');
-const promptModal = document.getElementById('prompt-modal');
-const shareModal = document.getElementById('share-modal');
+import { elements } from './dom.js'; // 引入 DOM 模組
 
 /**
  * 顯示提示訊息 (Toast)
  */
 export function showToast(message, type = 'success') {
-    if (toast && toastMessage) {
+    if (document.getElementById('toast') && document.getElementById('toast-message')) { // 暫時直接存取以維持相容性，因為 dom.js 可能不包含動態生成的元素
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
         toastMessage.textContent = message;
         toast.className = `fixed bottom-5 right-5 text-white py-2 px-5 rounded-lg shadow-xl opacity-0 transition-opacity duration-300 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
         toast.classList.remove('opacity-0');
@@ -86,9 +68,10 @@ export function startKeyTimer(expirationTime) {
  * 更新「開始出題/手動更新」按鈕的狀態與文字
  */
 export function updateRegenerateButtonState() {
-    if (!regenerateBtn || !previewActions) return;
+    if (!elements.regenerateBtn || !document.getElementById('preview-actions')) return;
+    const previewActions = document.getElementById('preview-actions');
 
-    const hasContent = (textInput && textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
+    const hasContent = (elements.textInput && elements.textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
     const isAutoMode = isAutoGenerateEnabled();
 
     if (!hasContent && !isAutoMode) {
@@ -102,22 +85,22 @@ export function updateRegenerateButtonState() {
     if (isAutoMode) {
         if (state.getGeneratedQuestions().length > 0) {
             previewActions.classList.remove('hidden');
-            regenerateBtn.classList.remove('themed-button-primary');
-            regenerateBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
-            regenerateBtn.innerHTML = refreshIcon + '手動更新';
+            elements.regenerateBtn.classList.remove('themed-button-primary');
+            elements.regenerateBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
+            elements.regenerateBtn.innerHTML = refreshIcon + '手動更新';
         } else {
             previewActions.classList.add('hidden');
         }
     } else {
         if (hasContent) {
             previewActions.classList.remove('hidden');
-            regenerateBtn.classList.add('themed-button-primary');
-            regenerateBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+            elements.regenerateBtn.classList.add('themed-button-primary');
+            elements.regenerateBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
             
             if (state.getGeneratedQuestions().length > 0) {
-                regenerateBtn.innerHTML = refreshIcon + '重新生成';
+                elements.regenerateBtn.innerHTML = refreshIcon + '重新生成';
             } else {
-                regenerateBtn.innerHTML = playIcon + '開始出題';
+                elements.regenerateBtn.innerHTML = playIcon + '開始出題';
             }
         } else {
              previewActions.classList.add('hidden');
@@ -130,7 +113,8 @@ export function updateRegenerateButtonState() {
  */
 export function initializeSortable() {
     if (state.getSortableInstance()) state.getSortableInstance().destroy();
-    if (!questionsContainer) return;
+    if (!document.getElementById('questions-container')) return;
+    const questionsContainer = document.getElementById('questions-container');
     const newSortable = new Sortable(questionsContainer, { 
         animation: 150, 
         handle: '.drag-handle', 
@@ -151,7 +135,8 @@ export function initializeSortable() {
  * 將生成的題目渲染到預覽區以供編輯
  */
 export function renderQuestionsForEditing(questions) {
-    if (!questionsContainer) return;
+    if (!document.getElementById('questions-container')) return;
+    const questionsContainer = document.getElementById('questions-container');
     questionsContainer.innerHTML = '';
     questions.forEach((q, index) => {
         const isTF = q.hasOwnProperty('is_correct');
@@ -170,7 +155,7 @@ export function renderQuestionsForEditing(questions) {
         `).join('');
 
         let aiInsightHtml = '';
-        if (questionStyleSelect && questionStyleSelect.value === 'competency-based' && questionData.design_concept) {
+        if (elements.questionStyleSelect && elements.questionStyleSelect.value === 'competency-based' && questionData.design_concept) {
             aiInsightHtml = `
                 <div class="relative flex items-center group">
                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm-.707 10.607a1 1 0 011.414 0l.707-.707a1 1 0 111.414 1.414l-.707.707a1 1 0 01-1.414 0zM4 11a1 1 0 100-2H3a1 1 0 100 2h1z" /></svg>
@@ -237,25 +222,27 @@ export function setupDragDrop(dropZone, fileHandler, isMultiple) {
 }
 
 export function showPostDownloadModal() {
-    if (postDownloadModal) postDownloadModal.classList.remove('hidden');
-    if (postDownloadModalContent) setTimeout(() => { postDownloadModalContent.classList.remove('scale-95', 'opacity-0'); }, 10);
+    if (elements.postDownloadModal) elements.postDownloadModal.classList.remove('hidden');
+    const content = document.getElementById('post-download-modal-content');
+    if (content) setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); }, 10);
 }
 export function hidePostDownloadModal() {
-    if (postDownloadModalContent) postDownloadModalContent.classList.add('scale-95', 'opacity-0');
-    if (postDownloadModal) setTimeout(() => { postDownloadModal.classList.add('hidden'); }, 200);
+    const content = document.getElementById('post-download-modal-content');
+    if (content) content.classList.add('scale-95', 'opacity-0');
+    if (elements.postDownloadModal) setTimeout(() => { elements.postDownloadModal.classList.add('hidden'); }, 200);
 }
 
 export function applyLayoutPreference() {
     const preferredLayout = localStorage.getItem('quizGenLayout_v2');
-    if (!mainContainer) return;
+    if (!elements.mainContainer) return;
 
-    const placeholderP = previewPlaceholder ? previewPlaceholder.querySelector('p') : null;
+    const placeholderP = elements.previewPlaceholder;
 
     if (preferredLayout === 'reversed') {
-        mainContainer.classList.add('lg:flex-row-reverse');
+        elements.mainContainer.classList.add('lg:flex-row-reverse');
         if (placeholderP) placeholderP.textContent = '請在右側提供內容並設定選項';
     } else {
-        mainContainer.classList.remove('lg:flex-row-reverse');
+        elements.mainContainer.classList.remove('lg:flex-row-reverse');
         if (placeholderP) placeholderP.textContent = '請在左側提供內容並設定選項';
     }
 }
@@ -269,15 +256,30 @@ export function applyThemePreference() {
 }
 
 export function populateVersionHistory() {
+    const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.2 內容擴充';
-    if (versionBtn) versionBtn.textContent = currentDisplayVersion;
+    const currentDisplayVersion = 'v8.3 體驗優化';
+    if (elements.versionBtn) elements.versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.2 內容擴充",
+            version: "v8.3 體驗優化",
             current: true,
+            notes: [
+                "【🚀 新功能】",
+                " - 新增「PDF 考卷 (A4)」與「純文字檔 (.txt)」匯出格式。",
+                " - 新增「試卷標題」欄位，可自訂匯出檔名與內容標題。",
+                "【✨ 優化】",
+                " - 學生程度設定全域自動同步，避免設定遺漏。",
+                " - 新增匯出格式與學生程度的強制檢查提示。",
+                " - 優化「清除所有內容」功能，確保徹底清空。",
+                " - 調整通知訊息位置至螢幕上方，提升可見度。",
+                " - 優化 PDF 匯入錯誤提示，更友善告知無法讀取的檔案類型。"
+            ]
+        },
+        {
+            version: "v8.2 內容擴充",
             notes: [
                 "【🚀 新功能】",
                 " - 新增「從網址匯入」功能，可自動擷取網頁文章或 YouTube 影片字幕。",
@@ -344,6 +346,11 @@ export async function updateVisitorCount() {
 
 export function askForLanguageChoice() {
     return new Promise((resolve, reject) => {
+        const languageChoiceModal = document.getElementById('language-choice-modal');
+        const languageChoiceModalContent = document.getElementById('language-choice-modal-content');
+        const langChoiceZhBtn = document.getElementById('lang-choice-zh-btn');
+        const langChoiceEnBtn = document.getElementById('lang-choice-en-btn');
+
         if (!languageChoiceModal || !languageChoiceModalContent) {
             return reject('Modal elements not found');
         }
@@ -386,15 +393,15 @@ export function hideLoader() {
 }
 
 export function showPromptModal() {
-    if (promptModal) promptModal.classList.remove('hidden');
+    if (elements.promptModal) elements.promptModal.classList.remove('hidden');
 }
 export function hidePromptModal() {
-    if (promptModal) promptModal.classList.add('hidden');
+    if (elements.promptModal) elements.promptModal.classList.add('hidden');
 }
 
 export function showShareModal() {
-    if (shareModal) shareModal.classList.remove('hidden');
+    if (elements.shareModal) elements.shareModal.classList.remove('hidden');
 }
 export function hideShareModal() {
-    if (shareModal) shareModal.classList.add('hidden');
+    if (elements.shareModal) elements.shareModal.classList.add('hidden');
 }

@@ -2,41 +2,144 @@ import { CONFIG, contentLoadingMessages, questionLoadingMessages } from './confi
 import * as state from './state.js';
 import { getApiKey, generateSingleBatch, fetchWithRetry } from './api.js';
 import * as ui from './ui.js';
-import { isEnglish, debounce, isAutoGenerateEnabled } from './utils.js';
+import * as utils from './utils.js'; // Changed to namespace import
+import { elements } from './dom.js';
+import { getContentSystemInstruction } from './prompts.js'; // Import prompt builder
 
-// --- DOM 元素 (Handlers-related) ---
-const textInput = document.getElementById('text-input');
-const fileInput = document.getElementById('file-input');
-const fileNameDisplay = document.getElementById('file-name-display');
-const fileErrorDisplay = document.getElementById('file-error-display');
-const imageInput = document.getElementById('image-input');
-const imagePreviewContainer = document.getElementById('image-preview-container');
-const imageErrorDisplay = document.getElementById('image-error-display');
-const urlInput = document.getElementById('url-input');
-const urlTypeWebRadio = document.getElementById('url-type-web');
-const numQuestionsInput = document.getElementById('num-questions');
-const formatSelect = document.getElementById('format-select');
-const questionTypeSelect = document.getElementById('question-type-select');
-const difficultySelect = document.getElementById('difficulty-select');
-const downloadTxtBtn = document.getElementById('download-txt-btn');
-const shareContentBtn = document.getElementById('share-content-btn');
-const questionStyleSelect = document.getElementById('question-style-select');
-const studentLevelSelect = document.getElementById('student-level-select');
-const tabImage = document.getElementById('tab-image');
-const tabText = document.getElementById('tab-text');
-const topicInput = document.getElementById('topic-input');
-const textTypeSelect = document.getElementById('text-type-select');
-const customTextTypeInput = document.getElementById('custom-text-type-input');
-const learningObjectivesInput = document.getElementById('learning-objectives-input');
-const toneSelect = document.getElementById('tone-select');
-const customToneInput = document.getElementById('custom-tone-input');
-const competencyBasedCheckbox = document.getElementById('competency-based-checkbox');
-const previewLoader = document.getElementById('preview-loader');
-const loadingText = document.getElementById('loading-text');
-const previewPlaceholder = document.getElementById('preview-placeholder');
-const questionsContainer = document.getElementById('questions-container');
-const previewActions = document.getElementById('preview-actions');
-const promptDisplayArea = document.getElementById('prompt-display-area');
+// Destructure what's needed for direct use, but keep 'utils' for namespace access
+const { isEnglish, debounce, isAutoGenerateEnabled, compressImage } = utils;
+
+// --- 草稿功能 ---
+const DRAFT_INPUTS_KEY = 'questwiz_draft_inputs_v1';
+
+function saveInputDraft() {
+    const draft = {
+        textInput: elements.textInput ? elements.textInput.value : '',
+        topicInput: elements.topicInput ? elements.topicInput.value : '',
+        learningObjectivesInput: elements.learningObjectivesInput ? elements.learningObjectivesInput.value : '',
+        textTypeSelect: elements.textTypeSelect ? elements.textTypeSelect.value : '科普說明文',
+        customTextTypeInput: elements.customTextTypeInput ? elements.customTextTypeInput.value : '',
+        toneSelect: elements.toneSelect ? elements.toneSelect.value : '客觀中立',
+        customToneInput: elements.customToneInput ? elements.customToneInput.value : '',
+        urlInput: elements.urlInput ? elements.urlInput.value : '',
+        numQuestionsInput: elements.numQuestionsInput ? elements.numQuestionsInput.value : '5',
+        questionTypeSelect: elements.questionTypeSelect ? elements.questionTypeSelect.value : 'multiple_choice',
+        difficultySelect: elements.difficultySelect ? elements.difficultySelect.value : '中等',
+        questionStyleSelect: elements.questionStyleSelect ? elements.questionStyleSelect.value : 'knowledge-recall',
+        studentLevelSelect: elements.studentLevelSelect ? elements.studentLevelSelect.value : '1-2',
+        competencyBasedCheckbox: elements.competencyBasedCheckbox ? elements.competencyBasedCheckbox.checked : false,
+        formatSelect: elements.formatSelect ? elements.formatSelect.value : '',
+        quizTitleInput: elements.quizTitleInput ? elements.quizTitleInput.value : '',
+        timestamp: Date.now()
+    };
+    localStorage.setItem(DRAFT_INPUTS_KEY, JSON.stringify(draft));
+}
+
+const debouncedSaveDraft = debounce(saveInputDraft, 1000);
+
+export function restoreDraft() {
+    // 1. 恢復 State (題目與圖片)
+    const stateDraft = state.loadDraftState();
+    if (stateDraft) {
+        // 檢查是否超時 (例如超過 24 小時就不恢復)
+        if (Date.now() - stateDraft.timestamp < 24 * 60 * 60 * 1000) {
+            if (stateDraft.generatedQuestions && stateDraft.generatedQuestions.length > 0) {
+                state.setGeneratedQuestions(stateDraft.generatedQuestions);
+                ui.renderQuestionsForEditing(stateDraft.generatedQuestions);
+                ui.initializeSortable();
+            }
+            if (stateDraft.uploadedImages && stateDraft.uploadedImages.length > 0) {
+                state.setUploadedImages(stateDraft.uploadedImages);
+                // 重新渲染圖片預覽
+                if (elements.imagePreviewContainer) {
+                    elements.imagePreviewContainer.innerHTML = '';
+                    const fragment = document.createDocumentFragment();
+                    stateDraft.uploadedImages.forEach(img => {
+                        const previewWrapper = document.createElement('div');
+                        previewWrapper.className = 'relative group';
+                        const imgElement = document.createElement('img');
+                        imgElement.src = `data:${img.type};base64,${img.data}`; 
+                        imgElement.className = 'w-full h-32 object-cover rounded-lg shadow-md';
+                        const removeBtn = document.createElement('div');
+                        removeBtn.className = 'absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer font-bold leading-none transition-all hover:bg-red-500/90 scale-0 group-hover:scale-100';
+                        removeBtn.innerHTML = '&times;';
+                        removeBtn.onclick = () => { 
+                            state.setUploadedImages(state.getUploadedImages().filter(i => i.id !== img.id)); 
+                            previewWrapper.remove();
+                            triggerOrUpdate();
+                        };
+                        previewWrapper.appendChild(imgElement); previewWrapper.appendChild(removeBtn);
+                        fragment.appendChild(previewWrapper);
+                    });
+                    elements.imagePreviewContainer.appendChild(fragment);
+                }
+            }
+        }
+    }
+
+    // 2. 恢復 Inputs
+    try {
+        const inputsString = localStorage.getItem(DRAFT_INPUTS_KEY);
+        if (inputsString) {
+            const inputs = JSON.parse(inputsString);
+            if (Date.now() - inputs.timestamp < 24 * 60 * 60 * 1000) {
+                if(elements.textInput) elements.textInput.value = inputs.textInput || '';
+                if(elements.topicInput) elements.topicInput.value = inputs.topicInput || '';
+                if(elements.learningObjectivesInput) elements.learningObjectivesInput.value = inputs.learningObjectivesInput || '';
+                if(elements.textTypeSelect) elements.textTypeSelect.value = inputs.textTypeSelect || '科普說明文';
+                if(elements.customTextTypeInput) {
+                    elements.customTextTypeInput.value = inputs.customTextTypeInput || '';
+                    if (inputs.textTypeSelect === 'custom') elements.customTextTypeInput.classList.remove('hidden');
+                }
+                if(elements.toneSelect) elements.toneSelect.value = inputs.toneSelect || '客觀中立';
+                if(elements.customToneInput) {
+                    elements.customToneInput.value = inputs.customToneInput || '';
+                    if (inputs.toneSelect === 'custom') elements.customToneInput.classList.remove('hidden');
+                }
+                if(elements.urlInput) elements.urlInput.value = inputs.urlInput || '';
+                if(elements.numQuestionsInput) elements.numQuestionsInput.value = inputs.numQuestionsInput || '5';
+                if(elements.questionTypeSelect) elements.questionTypeSelect.value = inputs.questionTypeSelect || 'multiple_choice';
+                if(elements.difficultySelect) elements.difficultySelect.value = inputs.difficultySelect || '中等';
+                if(elements.questionStyleSelect) elements.questionStyleSelect.value = inputs.questionStyleSelect || 'knowledge-recall';
+                if(elements.studentLevelSelect) elements.studentLevelSelect.value = inputs.studentLevelSelect || '1-2';
+                if(elements.quizTitleInput) elements.quizTitleInput.value = inputs.quizTitleInput || '';
+                if(elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = inputs.competencyBasedCheckbox || false;
+                if(elements.formatSelect) elements.formatSelect.value = inputs.formatSelect || '';
+
+                // 簡單判斷是否有恢復內容
+                if (inputs.textInput || inputs.topicInput || (stateDraft && stateDraft.generatedQuestions.length > 0)) {
+                    ui.showToast('已恢復上次未完成的草稿', 'success');
+                    ui.updateRegenerateButtonState();
+                    
+                    // 根據內容切換 Tab (簡單邏輯)
+                    if (inputs.topicInput) { if(elements.tabs.input.buttons[3]) elements.tabs.input.buttons[3].click(); } 
+                    else if (state.getUploadedImages().length > 0) { if(elements.tabs.input.buttons[1]) elements.tabs.input.buttons[1].click(); } 
+                    else if (inputs.textInput) { if(elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click(); }
+                }
+            }
+        }
+    } catch (e) {
+        console.error('恢復 Input 草稿失敗:', e);
+    }
+}
+
+// 為所有輸入欄位綁定自動儲存
+export function bindAutoSave() {
+    const inputs = [
+        elements.textInput, elements.topicInput, elements.learningObjectivesInput, 
+        elements.textTypeSelect, elements.customTextTypeInput, elements.toneSelect, 
+        elements.customToneInput, elements.urlInput, elements.numQuestionsInput, 
+        elements.questionTypeSelect, elements.difficultySelect, elements.questionStyleSelect, 
+        elements.studentLevelSelect, elements.competencyBasedCheckbox, elements.formatSelect
+    ];
+    inputs.forEach(input => {
+        if (input) {
+            const eventType = (input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
+            utils.addSafeEventListener(input, eventType, debouncedSaveDraft);
+        }
+    });
+}
+
 
 /**
  * 輔助函式：動態載入一個 script
@@ -63,50 +166,35 @@ function loadScript(src) {
  * @returns {string|null} - 組合好的提示詞字串，如果輸入無效則回傳 null
  */
 export function buildContentPrompt() {
-    const topic = topicInput.value;
+    const topic = elements.topicInput ? elements.topicInput.value : '';
     if (!topic.trim()) {
         ui.showToast('請輸入一個主題、單字或語詞！', 'error');
         return null;
     }
 
-    const textType = textTypeSelect.value === 'custom' ? customTextTypeInput.value.trim() : textTypeSelect.value;
-    const tone = toneSelect.value === 'custom' ? customToneInput.value.trim() : toneSelect.value;
+    const textType = elements.textTypeSelect.value === 'custom' ? elements.customTextTypeInput.value.trim() : elements.textTypeSelect.value;
+    const tone = elements.toneSelect.value === 'custom' ? elements.customToneInput.value.trim() : elements.toneSelect.value;
 
-    if ((textTypeSelect.value === 'custom' && !textType) || (toneSelect.value === 'custom' && !tone)) {
+    if ((elements.textTypeSelect.value === 'custom' && !textType) || (elements.toneSelect.value === 'custom' && !tone)) {
         ui.showToast('「自訂」選項的內容不能為空！', 'error');
         return null;
     }
     
-    const studentLevel = studentLevelSelect.value;
-    const studentGradeText = studentLevelSelect.options[studentLevelSelect.selectedIndex].text;
-    const learningObjectives = learningObjectivesInput.value;
+    const studentLevel = elements.studentLevelSelect.value;
+    const studentGradeText = elements.studentLevelSelect.options[elements.studentLevelSelect.selectedIndex].text;
+    const learningObjectives = elements.learningObjectivesInput ? elements.learningObjectivesInput.value : '';
     const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
     const wordCount = wordCountMap[studentLevel];
     
-    const topicSection = learningObjectives.trim()
-        ? `文章的核心主題是「${topic}」，並且必須清晰地圍繞以下核心學習目標或關鍵詞彙來撰寫：\n${learningObjectives}`
-        : `文章的核心主題是「${topic}」。`;
-
-    return `
-P (Persona):
-你是一位專為「${studentGradeText}」學生編寫教材的頂尖「${textType}」設計專家與作者。
-
-A (Act):
-你的任務是根據下方的要求，創作一篇長度約為 ${wordCount} 字的高品質教學文章。
-
-R (Recipient):
-這篇文章的目標讀者是「${studentGradeText}」的學生，請確保內容的深度與用詞符合他們的認知水平。
-
-T (Topic):
-${topicSection}
-
-S (Structure):
-請嚴格遵守以下格式與風格要求：
-1. 文章體裁：必須是「${textType}」。
-2. 寫作語氣：必須是「${tone}」。
-3. 文章結構：請為文章加上一個吸引人的標題，並將內容分成數個段落以便閱讀。
-4. 最終產出：直接提供完整的文章內容，不要包含任何額外的說明或開場白。
-    `;
+    // 使用 prompts.js 生成提示詞
+    return getContentSystemInstruction({
+        topic,
+        textType,
+        tone,
+        studentGradeText,
+        wordCount,
+        learningObjectives
+    });
 }
 
 /**
@@ -119,13 +207,17 @@ export async function callGeminiForContent(promptString) {
         return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
     }
 
-    ui.showLoader('AI 作家生成中...');
+    // 智慧載入狀態：開始輪播訊息
+    let messageIndex = 0;
+    ui.showLoader(contentLoadingMessages[0]);
+    const loaderInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % contentLoadingMessages.length;
+        ui.showLoader(contentLoadingMessages[messageIndex]);
+    }, 2500); 
     
     try {
         const requestBody = {
-            "contents": [{
-                "parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }]
-            }],
+            "contents": [{"parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }] }],
             "systemInstruction": {
                 "parts": [{ "text": promptString }]
             }
@@ -149,13 +241,16 @@ export async function callGeminiForContent(promptString) {
         const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (generatedText) {
-            textInput.value = generatedText;
+            elements.textInput.value = generatedText;
+            saveInputDraft(); // 生成後立即儲存
             ui.showToast('學習內文已成功生成！', 'success');
-            if (downloadTxtBtn) downloadTxtBtn.classList.remove('hidden');
-            if (shareContentBtn) shareContentBtn.classList.remove('hidden');
-            if (tabText) tabText.click();
-            if (competencyBasedCheckbox) competencyBasedCheckbox.checked = true;
-            if (questionStyleSelect) questionStyleSelect.value = 'competency-based';
+            if (elements.downloadTxtBtn) elements.downloadTxtBtn.classList.remove('hidden');
+            if (elements.shareContentBtn) elements.shareContentBtn.classList.remove('hidden');
+            
+            if (elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
+            
+            if (elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = true;
+            if (elements.questionStyleSelect) elements.questionStyleSelect.value = 'competency-based';
             triggerOrUpdate();
         } else { 
             throw new Error('AI未能生成內容，請檢查您的 API Key 或稍後再試。'); 
@@ -164,6 +259,7 @@ export async function callGeminiForContent(promptString) {
         console.error('生成內文時發生錯誤:', error);
         ui.showToast(error.message, 'error');
     } finally {
+        clearInterval(loaderInterval); 
         ui.hideLoader();
     }
 }
@@ -172,6 +268,19 @@ export async function callGeminiForContent(promptString) {
  * 3. 主按鈕「生成學習內文」的處理函式 (快速生成)
  */
 export function generateContentFromTopic() {
+    // Validate Student Level
+    if (!elements.studentLevelSelect.value) {
+        ui.showToast('請先選擇學生程度！', 'error');
+        if(elements.studentLevelSelectContent) {
+             elements.studentLevelSelectContent.focus();
+             elements.studentLevelSelectContent.classList.add('input-error');
+             setTimeout(() => elements.studentLevelSelectContent.classList.remove('input-error'), 2000);
+        } else if (elements.studentLevelSelect) {
+             elements.studentLevelSelect.focus();
+        }
+        return;
+    }
+
     const prompt = buildContentPrompt();
     if (prompt) {
         callGeminiForContent(prompt);
@@ -182,9 +291,20 @@ export function generateContentFromTopic() {
  * 4. 「預覽/修改提示詞」按鈕的處理函式
  */
 export function handlePreviewPrompt() {
+    // Validate Student Level for prompt preview as well
+    if (!elements.studentLevelSelect.value) {
+        ui.showToast('請先選擇學生程度！', 'error');
+        if(elements.studentLevelSelectContent) {
+             elements.studentLevelSelectContent.focus();
+             elements.studentLevelSelectContent.classList.add('input-error');
+             setTimeout(() => elements.studentLevelSelectContent.classList.remove('input-error'), 2000);
+        }
+        return;
+    }
+
     const prompt = buildContentPrompt();
-    if (prompt && promptDisplayArea) {
-        promptDisplayArea.value = prompt.trim();
+    if (prompt && elements.promptDisplayArea) {
+        elements.promptDisplayArea.value = prompt.trim();
         ui.showPromptModal();
     }
 }
@@ -193,8 +313,8 @@ export function handlePreviewPrompt() {
  * 5. 彈出視窗中「複製提示詞」按鈕的處理函式
  */
 export function handleCopyPrompt() {
-    if (!promptDisplayArea) return;
-    const textToCopy = promptDisplayArea.value;
+    if (!elements.promptDisplayArea) return;
+    const textToCopy = elements.promptDisplayArea.value;
     if (!textToCopy.trim()) {
         ui.showToast('沒有內容可以複製！', 'error');
         return;
@@ -211,8 +331,8 @@ export function handleCopyPrompt() {
  * 6. 彈出視窗中「以此提示詞生成內容」按鈕的處理函式
  */
 export function handleGenerateWithEditedPrompt() {
-    if (!promptDisplayArea) return;
-    const finalPrompt = promptDisplayArea.value;
+    if (!elements.promptDisplayArea) return;
+    const finalPrompt = elements.promptDisplayArea.value;
     if (!finalPrompt.trim()) {
         ui.showToast('提示詞內容不能為空！', 'error');
         return;
@@ -225,7 +345,7 @@ export function handleGenerateWithEditedPrompt() {
  * 7. 處理下載 .txt 檔案
  */
 export function handleDownloadTxt() {
-    const textToSave = textInput.value;
+    const textToSave = elements.textInput.value;
     if (!textToSave.trim()) {
         return ui.showToast('沒有內容可以下載！', 'error');
     }
@@ -244,7 +364,7 @@ export function handleDownloadTxt() {
  * 8. 處理分享內容的函式
  */
 export async function handleShareContent() {
-    const textToShare = textInput.value;
+    const textToShare = elements.textInput.value;
     if (!textToShare.trim()) {
         return ui.showToast('沒有內容可以分享！', 'error');
     }
@@ -267,12 +387,12 @@ export async function handleShareContent() {
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const shareUrl = `${baseUrl}${CONFIG.VIEW_PAGE_URL}?id=${contentId}`;
         
-        const shareLinkInput = document.getElementById('share-link-input');
+        const shareLinkInput = document.getElementById('share-link-input'); 
         if (shareLinkInput) {
             shareLinkInput.value = shareUrl;
         }
 
-        const qrCodeContainer = document.getElementById('qr-code-container');
+        const qrCodeContainer = document.getElementById('qr-code-container'); 
         if (qrCodeContainer) {
             qrCodeContainer.innerHTML = '';
             await loadScript('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js');
@@ -297,7 +417,7 @@ export async function handleShareContent() {
  * 9. 處理複製分享連結的函式
  */
 export function handleCopyLink() {
-    const shareLinkInput = document.getElementById('share-link-input');
+    const shareLinkInput = document.getElementById('share-link-input'); 
     if (shareLinkInput && shareLinkInput.value) {
         navigator.clipboard.writeText(shareLinkInput.value)
             .then(() => ui.showToast('連結已成功複製！', 'success'))
@@ -309,8 +429,8 @@ export function handleCopyLink() {
  * 10. 處理從 URL 擷取內容的函式
  */
 export async function handleExtractFromUrl() {
-    const url = urlInput ? urlInput.value.trim() : '';
-    const isYouTube = urlTypeWebRadio ? !urlTypeWebRadio.checked : false;
+    const url = elements.urlInput ? elements.urlInput.value.trim() : '';
+    const isYouTube = elements.urlTypeWebRadio ? !elements.urlTypeWebRadio.checked : false;
     
     if (!url) {
         return ui.showToast('請輸入網址！', 'error');
@@ -347,14 +467,14 @@ export async function handleExtractFromUrl() {
             fullText = `標題：${result.title}\n\n內文：\n${result.content}`;
         }
         
-        textInput.value = fullText;
+        elements.textInput.value = fullText;
+        saveInputDraft(); // 擷取後立即儲存
         ui.showToast('內容擷取成功！', 'success');
         
-        const tabText = document.getElementById('tab-text');
-        if (tabText) tabText.click();
+        if (elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
 
-        if (downloadTxtBtn) downloadTxtBtn.classList.remove('hidden');
-        if (shareContentBtn) shareContentBtn.classList.remove('hidden');
+        if (elements.downloadTxtBtn) elements.downloadTxtBtn.classList.remove('hidden');
+        if (elements.shareContentBtn) elements.shareContentBtn.classList.remove('hidden');
 
     } catch (error) {
         console.error('擷取內容失敗:', error);
@@ -377,13 +497,36 @@ export function triggerOrUpdate() {
 export const debouncedGenerate = debounce(triggerQuestionGeneration, CONFIG.DEBOUNCE_DELAY);
 
 export async function triggerQuestionGeneration() {
+    // Validate Student Level
+    if (!elements.studentLevelSelect.value) {
+        ui.showToast('請先選擇學生程度！', 'error');
+        if(elements.studentLevelSelectQuiz) {
+             elements.studentLevelSelectQuiz.focus();
+             elements.studentLevelSelectQuiz.classList.add('input-error');
+             setTimeout(() => elements.studentLevelSelectQuiz.classList.remove('input-error'), 2000);
+        } else if (elements.studentLevelSelect) {
+             elements.studentLevelSelect.focus();
+        }
+        return;
+    }
+
+    // Validate Export Format
+    if (!elements.formatSelect.value) {
+        ui.showToast('請先選擇匯出格式！', 'error');
+        elements.formatSelect.focus();
+        elements.formatSelect.classList.add('input-error');
+        setTimeout(() => elements.formatSelect.classList.remove('input-error'), 2000);
+        return;
+    }
+
+    const tabImage = elements.tabs.input.buttons[1];
     if (tabImage && tabImage.classList.contains('active') && state.getUploadedImages().length === 0) {
         return ui.showToast('請先上傳圖片！', 'error');
     }
-    const text = textInput ? textInput.value : '';
+    const text = elements.textInput ? elements.textInput.value : '';
     if (!text.trim() && state.getUploadedImages().length === 0) return;
-    if (previewPlaceholder && !previewPlaceholder.classList.contains('hidden')) {
-        previewPlaceholder.classList.add('hidden');
+    if (elements.previewPlaceholder && !elements.previewPlaceholder.classList.contains('hidden')) {
+        elements.previewPlaceholder.classList.add('hidden');
     }
     let languageChoice = 'chinese';
     if (isEnglish(text)) {
@@ -402,16 +545,17 @@ async function proceedWithGeneration(languageChoice) {
     if (!apiKey) {
         return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
     }
-    const text = textInput ? textInput.value : '';
-    const totalQuestions = numQuestionsInput ? parseInt(numQuestionsInput.value, 10) : 0;
-    const questionType = questionTypeSelect ? questionTypeSelect.value : 'multiple_choice';
-    const difficulty = difficultySelect ? difficultySelect.value : '中等';
-    const questionStyle = questionStyleSelect ? questionStyleSelect.value : 'knowledge-recall';
-    const studentLevel = studentLevelSelect ? studentLevelSelect.value : '1-2';
+    const text = elements.textInput ? elements.textInput.value : '';
+    const totalQuestions = elements.numQuestionsInput ? parseInt(elements.numQuestionsInput.value, 10) : 0;
+    const questionType = elements.questionTypeSelect ? elements.questionTypeSelect.value : 'multiple_choice';
+    const difficulty = elements.difficultySelect ? elements.difficultySelect.value : '中等';
+    const questionStyle = elements.questionStyleSelect ? elements.questionStyleSelect.value : 'knowledge-recall';
+    const studentLevel = elements.studentLevelSelect ? elements.studentLevelSelect.value : '1-2';
+    
     if ((!text.trim() && state.getUploadedImages().length === 0) || totalQuestions <= 0) {
-        if (questionsContainer) questionsContainer.innerHTML = '';
-        if (previewActions) previewActions.classList.add('hidden');
-        if (previewPlaceholder) previewPlaceholder.classList.remove('hidden');
+        if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+        if (elements.previewActions) elements.previewActions.classList.add('hidden');
+        if (elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
         return;
     }
     if (state.getCurrentRequestController()) {
@@ -419,9 +563,18 @@ async function proceedWithGeneration(languageChoice) {
     }
     state.setCurrentRequestController(new AbortController());
     const signal = state.getCurrentRequestController().signal;
-    ui.showLoader(questionLoadingMessages[Math.floor(Math.random() * questionLoadingMessages.length)]);
-    if (questionsContainer) questionsContainer.innerHTML = '';
-    if (previewActions) previewActions.classList.add('hidden');
+    
+    // 智慧載入狀態：開始輪播訊息 (出題版)
+    let messageIndex = 0;
+    ui.showLoader(questionLoadingMessages[0]);
+    const loaderInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % questionLoadingMessages.length;
+        ui.showLoader(questionLoadingMessages[messageIndex]);
+    }, 3000);
+
+    if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+    if (elements.previewActions) elements.previewActions.classList.add('hidden');
+    
     let allGeneratedQs = [];
     try {
         const BATCH_SIZE = CONFIG.API_BATCH_SIZE;
@@ -454,22 +607,23 @@ async function proceedWithGeneration(languageChoice) {
              userFriendlyMessage = "網路連線失敗，請檢查您的網路設定。";
          }
          ui.showToast(userFriendlyMessage, 'error');
-         if (questionsContainer) questionsContainer.innerHTML = '';
-         if (previewPlaceholder) previewPlaceholder.classList.remove('hidden');
+         if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+         if (elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
     } finally {
+        clearInterval(loaderInterval); // 停止輪播
         ui.hideLoader();
         ui.updateRegenerateButtonState();
     }
 }
 
 export function handleFile(file) {
-    if (fileErrorDisplay) fileErrorDisplay.textContent = ''; 
-    if (fileNameDisplay) fileNameDisplay.textContent = ''; 
-    if (fileInput) fileInput.value = '';
+    if (elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = ''; 
+    if (elements.fileNameDisplay) elements.fileNameDisplay.textContent = ''; 
+    if (elements.fileInput) elements.fileInput.value = '';
     if (!file) return;
-    if (file.type !== 'application/pdf' && file.type !== 'text/plain') { const errorMsg = '檔案格式不支援。'; ui.showToast(errorMsg, 'error'); if(fileErrorDisplay) fileErrorDisplay.textContent = errorMsg; return; }
-    if (file.size > CONFIG.MAX_FILE_SIZE_BYTES) { const errorMsg = `檔案過大 (${(CONFIG.MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB上限)。`; ui.showToast(errorMsg, 'error'); if(fileErrorDisplay) fileErrorDisplay.textContent = errorMsg; return; }
-    if (fileNameDisplay) fileNameDisplay.textContent = `已選：${file.name}`;
+    if (file.type !== 'application/pdf' && file.type !== 'text/plain') { const errorMsg = '檔案格式不支援。'; ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
+    if (file.size > CONFIG.MAX_FILE_SIZE_BYTES) { const errorMsg = `檔案過大 (${(CONFIG.MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB上限)。`; ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
+    if (elements.fileNameDisplay) elements.fileNameDisplay.textContent = `已選：${file.name}`;
     const reader = new FileReader();
     if (file.type === 'application/pdf') {
         reader.onload = async (e) => {
@@ -485,30 +639,40 @@ export function handleFile(file) {
                     const content = await page.getTextContent(); 
                     text += content.items.map(item => item.str).join(' '); 
                 }
-                if(textInput) textInput.value = text; 
+                if (!text.trim()) {
+                    throw new Error('此 PDF 為掃描檔或純圖片，無法提取文字內容。');
+                }
+                if(elements.textInput) elements.textInput.value = text; 
+                saveInputDraft(); // 讀取後立即儲存
                 ui.showToast('PDF 讀取成功！', 'success'); 
-                if(tabText) tabText.click(); 
+                if(elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
                 triggerOrUpdate();
             } catch (error) { 
-                console.error("PDF 讀取失敗:", error);
-                const errorMsg = "無法讀取此PDF，函式庫可能載入失敗。"; 
+                console.error("PDF 讀取失敗:", error); 
+                const errorMsg = error.message || "無法讀取此PDF檔案。"; 
                 ui.showToast(errorMsg, "error"); 
-                if(fileErrorDisplay) fileErrorDisplay.textContent = errorMsg; 
-                if(fileNameDisplay) fileNameDisplay.textContent = ''; 
+                if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg;
+                if(elements.fileNameDisplay) elements.fileNameDisplay.textContent = ''; 
             } finally {
                 ui.hideLoader();
             }
         };
         reader.readAsArrayBuffer(file);
     } else {
-        reader.onload = (e) => { if(textInput) textInput.value = e.target.result; ui.showToast('文字檔讀取成功！', 'success'); if(tabText) tabText.click(); triggerOrUpdate(); };
+        reader.onload = (e) => { 
+            if(elements.textInput) elements.textInput.value = e.target.result; 
+            saveInputDraft(); // 讀取後立即儲存
+            ui.showToast('文字檔讀取成功！', 'success'); 
+            if(elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
+            triggerOrUpdate(); 
+        };
         reader.readAsText(file);
     }
 }
 
 export function handleImageFiles(newFiles) {
     if (!newFiles || newFiles.length === 0) return;
-    if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
+    if(elements.imageErrorDisplay) elements.imageErrorDisplay.innerHTML = ''; 
     const { MAX_IMAGE_SIZE_BYTES, MAX_TOTAL_IMAGE_SIZE_BYTES } = CONFIG;
     let currentTotalSize = state.getUploadedImages().reduce((sum, img) => sum + img.size, 0);
     let errorMessages = [], sizeLimitReached = false;
@@ -518,87 +682,282 @@ export function handleImageFiles(newFiles) {
         if (currentTotalSize + file.size > MAX_TOTAL_IMAGE_SIZE_BYTES) { if (!sizeLimitReached) { errorMessages.push(`圖片總量超過上限。`); sizeLimitReached = true; } return false; }
         currentTotalSize += file.size; return true;
     });
-    if (errorMessages.length > 0) { if(imageErrorDisplay) imageErrorDisplay.innerHTML = errorMessages.join('<br>'); ui.showToast('部分圖片上傳失敗。', 'error'); }
-    if (validFiles.length === 0) { if(imageInput) imageInput.value = ''; return; }
+    if (errorMessages.length > 0) { if(elements.imageErrorDisplay) elements.imageErrorDisplay.innerHTML = errorMessages.join('<br>'); ui.showToast('部分圖片上傳失敗。', 'error'); }
+    if (validFiles.length === 0) { if(elements.imageInput) elements.imageInput.value = ''; return; }
+    
     const fragment = document.createDocumentFragment();
     let filesToProcess = validFiles.length;
+
     validFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const fullBase64 = e.target.result, base64Data = fullBase64.split(',')[1];
-            const imageObject = { id: Date.now() + Math.random(), type: file.type, data: base64Data, size: file.size };
-            let currentImages = state.getUploadedImages();
-            currentImages.push(imageObject);
-            state.setUploadedImages(currentImages);
-            const previewWrapper = document.createElement('div');
-            previewWrapper.className = 'relative group';
-            const imgElement = document.createElement('img');
-            imgElement.src = fullBase64; imgElement.alt = `圖片預覽`; imgElement.className = 'w-full h-32 object-cover rounded-lg shadow-md';
-            const removeBtn = document.createElement('div');
-            removeBtn.className = 'absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer font-bold leading-none transition-all hover:bg-red-500/90 scale-0 group-hover:scale-100';
-            removeBtn.innerHTML = '&times;';
-            removeBtn.onclick = () => { 
-                state.setUploadedImages(state.getUploadedImages().filter(img => img.id !== imageObject.id)); 
-                previewWrapper.remove();
-                triggerOrUpdate();
+        compressImage(file).then(compressedFile => { 
+             const reader = new FileReader();
+             reader.onload = (e) => {
+                const fullBase64 = e.target.result, base64Data = fullBase64.split(',')[1];
+                const fileSize = compressedFile instanceof Blob ? compressedFile.size : file.size;
+                
+                const imageObject = { id: Date.now() + Math.random(), type: file.type, data: base64Data, size: fileSize };
+                let currentImages = state.getUploadedImages();
+                currentImages.push(imageObject);
+                state.setUploadedImages(currentImages);
+                const previewWrapper = document.createElement('div');
+                previewWrapper.className = 'relative group';
+                const imgElement = document.createElement('img');
+                imgElement.src = fullBase64; imgElement.alt = `圖片預覽`; imgElement.className = 'w-full h-32 object-cover rounded-lg shadow-md';
+                const removeBtn = document.createElement('div');
+                removeBtn.className = 'absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer font-bold leading-none transition-all hover:bg-red-500/90 scale-0 group-hover:scale-100';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.onclick = () => { 
+                    state.setUploadedImages(state.getUploadedImages().filter(img => img.id !== imageObject.id)); 
+                    previewWrapper.remove();
+                    triggerOrUpdate();
+                };
+                previewWrapper.appendChild(imgElement); previewWrapper.appendChild(removeBtn);
+                fragment.appendChild(previewWrapper);
+                if (--filesToProcess === 0) { 
+                    if (elements.imagePreviewContainer) elements.imagePreviewContainer.appendChild(fragment); 
+                    triggerOrUpdate();
+                }
             };
-            previewWrapper.appendChild(imgElement); previewWrapper.appendChild(removeBtn);
-            fragment.appendChild(previewWrapper);
-            if (--filesToProcess === 0) { 
-                if (imagePreviewContainer) imagePreviewContainer.appendChild(fragment); 
-                triggerOrUpdate();
-            }
-        };
-        reader.readAsDataURL(file);
+            reader.readAsDataURL(compressedFile); 
+        }).catch(err => {
+            console.error("Image compression failed, falling back to original", err);
+             const reader = new FileReader();
+             reader.onload = (e) => {
+                const fullBase64 = e.target.result, base64Data = fullBase64.split(',')[1];
+                const imageObject = { id: Date.now() + Math.random(), type: file.type, data: base64Data, size: file.size };
+                let currentImages = state.getUploadedImages();
+                currentImages.push(imageObject);
+                state.setUploadedImages(currentImages);
+                const previewWrapper = document.createElement('div');
+                previewWrapper.className = 'relative group';
+                const imgElement = document.createElement('img');
+                imgElement.src = fullBase64; imgElement.alt = `圖片預覽`; imgElement.className = 'w-full h-32 object-cover rounded-lg shadow-md';
+                const removeBtn = document.createElement('div');
+                removeBtn.className = 'absolute -top-2 -right-2 bg-black/70 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer font-bold leading-none transition-all hover:bg-red-500/90 scale-0 group-hover:scale-100';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.onclick = () => { 
+                    state.setUploadedImages(state.getUploadedImages().filter(img => img.id !== imageObject.id)); 
+                    previewWrapper.remove();
+                    triggerOrUpdate();
+                };
+                previewWrapper.appendChild(imgElement); previewWrapper.appendChild(removeBtn);
+                fragment.appendChild(previewWrapper);
+                if (--filesToProcess === 0) { 
+                    if (elements.imagePreviewContainer) elements.imagePreviewContainer.appendChild(fragment); 
+                    triggerOrUpdate();
+                }
+            };
+            reader.readAsDataURL(file);
+        });
     });
-    if(imageInput) imageInput.value = '';
+    if(elements.imageInput) elements.imageInput.value = '';
 }
 
 export async function exportFile() {
     const questions = state.getGeneratedQuestions();
-    const format = formatSelect ? formatSelect.value : '';
+    const format = elements.formatSelect ? elements.formatSelect.value : '';
     if (!format) return ui.showToast('請選擇匯出檔案格式！', 'error');
     if (!questions || questions.length === 0) return ui.showToast('沒有可匯出的題目！', 'error');
+    
+    const titleInput = elements.quizTitleInput ? elements.quizTitleInput.value.trim() : '';
+    const title = titleInput || '測驗卷';
+    // 若使用者有輸入標題，檔名使用標題；否則使用預設英文前綴以免檔名太長或怪異，但這裡為了符合使用者期待，預設也可用中文
+    const safeTitle = titleInput ? titleInput.replace(/[\\/:*?"<>|]/g, '_') : 'Quiz_Paper'; 
+
     let data, filename, success = false;
     try {
         ui.showLoader('正在準備匯出檔案...');
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
-        const XLSX = window.XLSX;
-        if (!XLSX) {
-            throw new Error('XLSX library failed to load on window object.');
-        }
-        const standardMCQs = questions.map(q => q.hasOwnProperty('is_correct') ? { text: q.text, options: ['是', '否'], correct: [q.is_correct ? 0 : 1], time: 30, explanation: q.explanation || '' } : q);
-        switch (format) {
-            case 'wordwall':
-                data = standardMCQs.map(q => ({ '問題': q.text, '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '', '正確選項': q.correct.length > 0 ? (q.correct[0] + 1) : '' }));
-                filename = 'Wordwall_Quiz.xlsx'; 
-                break;
-            case 'kahoot':
-                const kahootData = [ ['Kahoot Quiz Template'], [], [], [], ['Question', 'Answer 1', 'Answer 2', 'Answer 3', 'Answer 4', 'Time limit (sec)', 'Correct answer(s)'] ];
-                standardMCQs.forEach(q => { kahootData.push([ q.text, q.options[0] || '', q.options[1] || '', q.options[2] || '', q.options[3] || '', q.time || 30, q.correct.map(i => i + 1).join(',') ]); });
-                const ws = XLSX.utils.aoa_to_sheet(kahootData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-                XLSX.writeFile(wb, 'Kahoot_Quiz.xlsx');
-                success = true;
-                break;
-            case 'wayground':
-                data = standardMCQs.map(q => ({
-                    'Question Text': q.text, 'Question Type': (q.correct || []).length > 1 ? 'Checkbox' : 'Multiple Choice', 'Option 1': q.options[0] || '', 'Option 2': q.options[1] || '', 'Option 3': q.options[2] || '', 'Option 4': q.options[3] || '', 'Option 5': '', 'Correct Answer': (q.correct || []).map(i => i + 1).join(','), 'Time in seconds': q.time || 30, 'Image Link': '', 'Answer explanation': q.explanation || ''
-                }));
-                filename = 'Wayground_Quiz.xlsx';
-                break;
-            case 'loilonote':
-                data = standardMCQs.map(q => ({
-                    '問題（請勿編輯標題）': q.text, '務必作答（若此問題需要回答，請輸入1）': 1, '每題得分（未填入的部分將被自動設為1）': 1, '正確答案的選項（若有複數正確答案選項，請用「、」或「 , 」來分隔選項編號）': (q.correct || []).map(i => i + 1).join(','), '說明': q.explanation || '', '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '',
-                }));
-                filename = 'LoiLoNote_Quiz.xlsx';
-                break;
-            default: throw new Error('未知的格式');
-        }
-        if(data) {
-            const worksheet = XLSX.utils.json_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
-            XLSX.writeFile(workbook, filename);
+        
+        if (format === 'pdf') {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+            
+            if (!window.html2canvas || !window.jspdf) {
+                throw new Error('PDF 匯出函式庫載入失敗。');
+            }
+
+            // 1. 建立隱藏的 PDF 渲染容器
+            let pdfContainer = document.getElementById('pdf-export-container');
+            if (!pdfContainer) {
+                pdfContainer = document.createElement('div');
+                pdfContainer.id = 'pdf-export-container';
+                // 設定樣式以模擬 A4 紙張 (寬度 210mm，解析度較高以確保清晰)
+                pdfContainer.style.position = 'fixed';
+                pdfContainer.style.left = '-9999px';
+                pdfContainer.style.top = '0';
+                pdfContainer.style.width = '210mm';
+                pdfContainer.style.minHeight = '297mm';
+                pdfContainer.style.padding = '20mm';
+                pdfContainer.style.backgroundColor = 'white';
+                pdfContainer.style.fontFamily = '"Noto Sans TC", sans-serif';
+                pdfContainer.style.color = '#000';
+                pdfContainer.style.boxSizing = 'border-box';
+                document.body.appendChild(pdfContainer);
+            }
+
+            // 2. 產生 HTML 內容
+            const date = new Date().toLocaleDateString('zh-TW');
+            let htmlContent = `
+                <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
+                    <h1 style="font-size: 24px; margin: 0; font-weight: bold;">${title}</h1>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 14px;">
+                        <span>日期：${date}</span>
+                        <span>班級：__________  姓名：__________  座號：_____</span>
+                        <span>得分：__________</span>
+                    </div>
+                </div>
+                <div style="font-size: 14px; line-height: 1.6;">
+            `;
+
+            questions.forEach((q, index) => {
+                const isTF = q.hasOwnProperty('is_correct');
+                htmlContent += `
+                    <div style="margin-bottom: 15px; page-break-inside: avoid;">
+                        <div style="display: flex; align-items: baseline;">
+                            <span style="font-weight: bold; margin-right: 5px;">${index + 1}.</span>
+                            <div>${q.text}</div>
+                        </div>
+                `;
+
+                if (!isTF && q.options) {
+                    htmlContent += `<div style="margin-left: 25px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">`;
+                    q.options.forEach((opt, i) => {
+                        const label = String.fromCharCode(65 + i); // A, B, C, D
+                        htmlContent += `<div>(${label}) ${opt}</div>`;
+                    });
+                    htmlContent += `</div>`;
+                } else if (isTF) {
+                    htmlContent += `<div style="margin-left: 25px; margin-top: 5px;">(  ) 是   (  ) 否</div>`;
+                }
+                
+                htmlContent += `</div>`;
+            });
+
+            htmlContent += `</div>`; // End main content div
+            
+            pdfContainer.innerHTML = htmlContent;
+
+            // 3. 轉成 Canvas
+            const canvas = await window.html2canvas(pdfContainer, {
+                scale: 2, // 提高解析度
+                useCORS: true
+            });
+
+            // 4. 轉成 PDF
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            
+            // 分頁處理
+            if (pdfHeight > pdf.internal.pageSize.getHeight()) {
+                 let heightLeft = pdfHeight;
+                 let position = 0;
+                 const pageHeight = pdf.internal.pageSize.getHeight();
+
+                 pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+                 heightLeft -= pageHeight;
+
+                 while (heightLeft >= 0) {
+                   position = heightLeft - pdfHeight;
+                   pdf.addPage();
+                   pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+                   heightLeft -= pageHeight;
+                 }
+            } else {
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            }
+
+            pdf.save(`${safeTitle}.pdf`);
+            
+            // 清理
+            document.body.removeChild(pdfContainer);
             success = true;
+
+        } else if (format === 'txt') {
+            const date = new Date().toLocaleDateString('zh-TW');
+            let txtContent = `${title}\n日期：${date}\n班級：__________  姓名：__________  座號：_____\n得分：__________\n\n`;
+            
+            questions.forEach((q, index) => {
+                txtContent += `${index + 1}. ${q.text}\n`;
+                if (q.hasOwnProperty('is_correct')) { // True/False
+                    txtContent += `(  ) 是   (  ) 否\n`;
+                } else if (q.options) { // MCQ
+                    q.options.forEach((opt, i) => {
+                        const label = String.fromCharCode(65 + i);
+                        txtContent += `(${label}) ${opt}  `;
+                    });
+                    txtContent += `\n`;
+                }
+                txtContent += `\n`;
+            });
+            
+            // Append Answer Key at the bottom
+            txtContent += `\n\n--- 解答 ---\n`;
+            questions.forEach((q, index) => {
+                let answer = '';
+                if (q.hasOwnProperty('is_correct')) {
+                    answer = q.is_correct ? '是' : '否';
+                } else if (q.correct && q.correct.length > 0) {
+                    answer = q.correct.map(i => String.fromCharCode(65 + i)).join(', ');
+                }
+                txtContent += `${index + 1}. ${answer}\n`;
+            });
+
+            const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${safeTitle}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            success = true;
+
+        } else {
+            // 既有的 Excel 匯出邏輯
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+            const XLSX = window.XLSX;
+            if (!XLSX) {
+                throw new Error('XLSX library failed to load on window object.');
+            }
+            const standardMCQs = questions.map(q => q.hasOwnProperty('is_correct') ? { text: q.text, options: ['是', '否'], correct: [q.is_correct ? 0 : 1], time: 30, explanation: q.explanation || '' } : q);
+            switch (format) {
+                case 'wordwall':
+                    data = standardMCQs.map(q => ({ '問題': q.text, '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '', '正確選項': q.correct.length > 0 ? (q.correct[0] + 1) : '' }));
+                    filename = `${safeTitle}_Wordwall.xlsx`; 
+                    break;
+                case 'kahoot':
+                    const kahootData = [ ['Kahoot Quiz Template'], [], [], [], ['Question', 'Answer 1', 'Answer 2', 'Answer 3', 'Answer 4', 'Time limit (sec)', 'Correct answer(s)'] ];
+                    standardMCQs.forEach(q => { kahootData.push([ q.text, q.options[0] || '', q.options[1] || '', q.options[2] || '', q.options[3] || '', q.time || 30, q.correct.map(i => i + 1).join(',') ]); });
+                    const ws = XLSX.utils.aoa_to_sheet(kahootData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                    XLSX.writeFile(wb, `${safeTitle}_Kahoot.xlsx`);
+                    success = true;
+                    break;
+                case 'wayground':
+                    data = standardMCQs.map(q => ({
+                        'Question Text': q.text, 'Question Type': (q.correct || []).length > 1 ? 'Checkbox' : 'Multiple Choice', 'Option 1': q.options[0] || '', 'Option 2': q.options[1] || '', 'Option 3': q.options[2] || '', 'Option 4': q.options[3] || '', 'Option 5': '', 'Correct Answer': (q.correct || []).map(i => i + 1).join(','), 'Time in seconds': q.time || 30, 'Image Link': '', 'Answer explanation': q.explanation || ''
+                    }));
+                    filename = `${safeTitle}_Wayground.xlsx`;
+                    break;
+                case 'loilonote':
+                    data = standardMCQs.map(q => ({
+                        '問題（請勿編輯標題）': q.text, '務必作答（若此問題需要回答，請輸入1）': 1, '每題得分（未填入的部分將被自動設為1）': 1, '正確答案的選項（若有複數正確答案選項，請用「、」或「 , 」來分隔選項編號）': (q.correct || []).map(i => i + 1).join(','), '說明': q.explanation || '', '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '',
+                    }));
+                    filename = `${safeTitle}_LoiLoNote.xlsx`;
+                    break;
+                default: throw new Error('未知的格式');
+            }
+            if(data) {
+                const worksheet = XLSX.utils.json_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+                XLSX.writeFile(workbook, filename);
+                success = true;
+            }
         }
+
         if (success) {
             ui.showPostDownloadModal();
         }
@@ -611,37 +970,51 @@ export async function exportFile() {
 }
 
 export function clearAllInputs() {
-    if(textInput) textInput.value = ''; 
-    if(fileInput) fileInput.value = ''; 
-    if(fileNameDisplay) fileNameDisplay.textContent = ''; 
-    if(fileErrorDisplay) fileErrorDisplay.textContent = '';
-    if(imageInput) imageInput.value = ''; 
-    if(imagePreviewContainer) imagePreviewContainer.innerHTML = ''; 
-    if(imageErrorDisplay) imageErrorDisplay.innerHTML = ''; 
-    if(urlInput) urlInput.value = '';
+    if(elements.textInput) elements.textInput.value = ''; 
+    if(elements.fileInput) elements.fileInput.value = ''; 
+    if(elements.fileNameDisplay) elements.fileNameDisplay.textContent = ''; 
+    if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = '';
+    if(elements.imageInput) elements.imageInput.value = ''; 
+    if(elements.imagePreviewContainer) elements.imagePreviewContainer.innerHTML = ''; 
+    if(elements.imageErrorDisplay) elements.imageErrorDisplay.innerHTML = ''; 
+    if(elements.urlInput) elements.urlInput.value = '';
     state.setUploadedImages([]);
     
-    if(downloadTxtBtn) downloadTxtBtn.classList.add('hidden');
-    if(shareContentBtn) shareContentBtn.classList.add('hidden');
+    if(elements.downloadTxtBtn) elements.downloadTxtBtn.classList.add('hidden');
+    if(elements.shareContentBtn) elements.shareContentBtn.classList.add('hidden');
     
-    if(topicInput) topicInput.value = ''; 
-    if(textTypeSelect) textTypeSelect.value = '科普說明文';
-    if(customTextTypeInput) {
-        customTextTypeInput.value = '';
-        customTextTypeInput.classList.add('hidden');
+    if(elements.topicInput) elements.topicInput.value = ''; 
+    if(elements.textTypeSelect) elements.textTypeSelect.value = '科普說明文';
+    if(elements.customTextTypeInput) {
+        elements.customTextTypeInput.value = '';
+        elements.customTextTypeInput.classList.add('hidden');
     }
-    if(learningObjectivesInput) learningObjectivesInput.value = '';
-    if(toneSelect) toneSelect.value = '客觀中立';
-    if(customToneInput) {
-        customToneInput.value = '';
-        customToneInput.classList.add('hidden');
+    if(elements.learningObjectivesInput) elements.learningObjectivesInput.value = '';
+    if(elements.toneSelect) elements.toneSelect.value = '客觀中立';
+    if(elements.customToneInput) {
+        elements.customToneInput.value = '';
+        elements.customToneInput.classList.add('hidden');
     }
-    if(competencyBasedCheckbox) competencyBasedCheckbox.checked = false;
+    if(elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = false;
+    if(elements.quizTitleInput) elements.quizTitleInput.value = ''; // Clear Title
     
-    if(questionStyleSelect) questionStyleSelect.value = 'knowledge-recall';
+    // Reset all student level selects
+    if(elements.studentLevelSelects) {
+        elements.studentLevelSelects.forEach(s => { if(s) s.value = ''; }); 
+    } else if(elements.studentLevelSelect) {
+        elements.studentLevelSelect.value = '';
+    }
+
+    if(elements.questionStyleSelect) elements.questionStyleSelect.value = 'knowledge-recall';
+    if(elements.formatSelect) elements.formatSelect.value = ''; // Reset format
+
     state.setGeneratedQuestions([]);
-    if(questionsContainer) questionsContainer.innerHTML = '';
-    if(previewPlaceholder) previewPlaceholder.classList.remove('hidden');
+    if(elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+    if(elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
+    
+    localStorage.removeItem('questwiz_draft_inputs_v1'); // 清除草稿
+    state.clearDraftState(); // 清除 state 草稿
+
     ui.updateRegenerateButtonState();
     ui.showToast('內容已全部清除！', 'success');
 }
