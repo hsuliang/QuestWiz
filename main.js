@@ -29,14 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 恢復草稿
     handlers.restoreDraft();
     handlers.bindAutoSave();
+    
+    // 初始檢查按鈕狀態
+    handlers.checkContentAndToggleButton();
 
-    // 初始化「自動出題」開關
-    if (elements.autoGenerateToggle) {
-        elements.autoGenerateToggle.checked = utils.isAutoGenerateEnabled();
-        if (elements.autoGenerateToggle.checked) {
-            getControls().forEach(control => utils.addSafeEventListener(control, control.type === 'number' || control.tagName === 'TEXTAREA' ? 'input' : 'change', handlers.debouncedGenerate));
-        }
-    }
     ui.updateRegenerateButtonState();
 
 
@@ -47,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     utils.addSafeEventListener(elements.shareContentBtn, 'click', handlers.handleShareContent, 'shareContentBtn');
     utils.addSafeEventListener(elements.clearContentBtn, 'click', handlers.clearAllInputs, 'clearContentBtn');
     utils.addSafeEventListener(elements.downloadBtn, 'click', handlers.exportFile, 'downloadBtn');
+    utils.addSafeEventListener(elements.resetBtn, 'click', handlers.clearAllInputs, 'resetBtn');
     utils.addSafeEventListener(elements.regenerateBtn, 'click', handlers.triggerQuestionGeneration, 'regenerateBtn');
     utils.addSafeEventListener(elements.generateFromImagesBtn, 'click', handlers.triggerQuestionGeneration, 'generateFromImagesBtn');
     
@@ -57,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasText = elements.textInput.value.trim() !== '';
         elements.downloadTxtBtn.classList.toggle('hidden', !hasText);
         elements.shareContentBtn.classList.toggle('hidden', !hasText);
-        ui.updateRegenerateButtonState();
+        handlers.checkContentAndToggleButton();
     }, 'textInput');
 
     utils.addSafeEventListener(elements.formatSelect, 'change', () => {
@@ -147,19 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.previewPlaceholder) elements.previewPlaceholder.textContent = isReversed ? '請在右側提供內容並設定選項' : '請在左側提供內容並設定選項';
     }, 'layoutToggleBtn');
 
-    utils.addSafeEventListener(elements.autoGenerateToggle, 'change', (e) => {
-        const isEnabled = e.target.checked;
-        localStorage.setItem('quizGenAutoGenerate_v1', isEnabled);
-        getControls().forEach(control => {
-            const eventType = control.type === 'number' || control.tagName === 'TEXTAREA' ? 'input' : 'change';
-            control.removeEventListener(eventType, handlers.debouncedGenerate);
-            if (isEnabled) {
-                utils.addSafeEventListener(control, eventType, handlers.debouncedGenerate);
-            }
-        });
-        ui.updateRegenerateButtonState();
-    }, 'autoGenerateToggle');
-    
     if (elements.themeRadios) {
         elements.themeRadios.forEach(radio => {
             utils.addSafeEventListener(radio, 'change', () => {

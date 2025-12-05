@@ -26,7 +26,6 @@ export const elements = {
     questionStyleSelect: document.getElementById('question-style-select'),
     studentLevelSelect: document.getElementById('student-level-select'),
     studentLevelSelectQuiz: document.getElementById('student-level-select-quiz'), // 新增
-    autoGenerateToggle: document.getElementById('auto-generate-toggle'),
     
     // API Key 相關
     apiKeyInput: document.getElementById('api-key-input'),
@@ -46,6 +45,7 @@ export const elements = {
     extractFromUrlBtn: document.getElementById('extract-from-url-btn'),
     generateFromImagesBtn: document.getElementById('generate-from-images-btn'),
     downloadBtn: document.getElementById('download-btn'),
+    resetBtn: document.getElementById('reset-btn'),
     regenerateBtn: document.getElementById('regenerate-btn'),
     layoutToggleBtn: document.getElementById('layout-toggle-btn'),
     collapseSettingsBtn: document.getElementById('collapse-settings-btn'),
@@ -61,14 +61,12 @@ export const elements = {
             buttons: [
                 document.getElementById('settings-tab-api'),
                 document.getElementById('settings-tab-level'),
-                document.getElementById('settings-tab-mode'),
                 document.getElementById('settings-tab-theme'),
                 document.getElementById('settings-tab-layout')
             ],
             contents: [
                 document.getElementById('settings-content-api'),
                 document.getElementById('settings-content-level'),
-                document.getElementById('settings-content-mode'),
                 document.getElementById('settings-content-theme'),
                 document.getElementById('settings-content-layout')
             ]

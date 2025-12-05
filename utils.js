@@ -37,12 +37,11 @@ export function isEnglish(text) {
 }
 
 /**
- * 檢查「自動出題」設定是否啟用
+ * 檢查「自動出題」設定是否啟用 (已棄用，恆回傳 false)
  * @returns {boolean}
  */
 export function isAutoGenerateEnabled() {
-    const setting = localStorage.getItem('quizGenAutoGenerate_v1');
-    return setting === 'true'; // 預設為停用 (當設定為 null 或非 'true' 時皆返回 false)
+    return false;
 }
 
 /**

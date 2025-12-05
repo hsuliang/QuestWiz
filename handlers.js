@@ -487,14 +487,32 @@ export async function handleExtractFromUrl() {
 
 // --- 其餘既有函式 ---
 
-export function triggerOrUpdate() {
-    if (isAutoGenerateEnabled()) {
-        debouncedGenerate();
-    } else {
-        ui.updateRegenerateButtonState();
+/**
+ * 檢查是否有內容 (文字或圖片)，並據此切換「開始出題」按鈕的顯示狀態
+ */
+export function checkContentAndToggleButton() {
+    const hasText = elements.textInput && elements.textInput.value.trim() !== '';
+    const hasImages = state.getUploadedImages().length > 0;
+    
+    if (elements.regenerateBtn) {
+        if (hasText || hasImages) {
+            elements.regenerateBtn.classList.remove('hidden');
+        } else {
+            elements.regenerateBtn.classList.add('hidden');
+        }
     }
+    
+    // 同步更新按鈕文字與狀態
+    ui.updateRegenerateButtonState();
 }
-export const debouncedGenerate = debounce(triggerQuestionGeneration, CONFIG.DEBOUNCE_DELAY);
+
+export function triggerOrUpdate() {
+    // 每次內容變更時，僅檢查是否顯示按鈕，不再自動生成
+    checkContentAndToggleButton();
+}
+
+// 移除自動生成邏輯，但為了相容性保留空函式或直接指向 checkContentAndToggleButton
+export const debouncedGenerate = debounce(checkContentAndToggleButton, CONFIG.DEBOUNCE_DELAY);
 
 export async function triggerQuestionGeneration() {
     // Validate Student Level
@@ -1015,6 +1033,6 @@ export function clearAllInputs() {
     localStorage.removeItem('questwiz_draft_inputs_v1'); // 清除草稿
     state.clearDraftState(); // 清除 state 草稿
 
-    ui.updateRegenerateButtonState();
+    checkContentAndToggleButton(); // 更新按鈕顯示狀態
     ui.showToast('內容已全部清除！', 'success');
 }

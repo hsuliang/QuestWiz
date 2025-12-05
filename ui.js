@@ -65,45 +65,43 @@ export function startKeyTimer(expirationTime) {
 }
 
 /**
- * 更新「開始出題/手動更新」按鈕的狀態與文字
+ * 更新「開始出題/重新生成」按鈕與「下載/重置」區塊的狀態
  */
 export function updateRegenerateButtonState() {
-    if (!elements.regenerateBtn || !document.getElementById('preview-actions')) return;
-    const previewActions = document.getElementById('preview-actions');
+    // 1. 控制左側「開始出題」按鈕 (regenerate-btn)
+    // 邏輯：有輸入內容 (文字或圖片) 時顯示，否則隱藏。
+    // 文字部分已在 handlers.checkContentAndToggleButton 處理，但這裡做狀態更新 (文字變更)
+    if (elements.regenerateBtn) {
+        const hasContent = (elements.textInput && elements.textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
+        const hasQuestions = state.getGeneratedQuestions().length > 0;
+        
+        const refreshIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10 10a1 1 0 01-1 1H5a1 1 0 110-2h5.001a5.002 5.002 0 004.087-7.885 1 1 0 111.732-1.001A7.002 7.002 0 0114 12z" clip-rule="evenodd" /></svg>`;
+        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
 
-    const hasContent = (elements.textInput && elements.textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
-    const isAutoMode = isAutoGenerateEnabled();
-
-    if (!hasContent && !isAutoMode) {
-        previewActions.classList.add('hidden');
-        return;
+        // 更新按鈕文字：若已有題目則顯示「重新生成」，否則顯示「開始出題」
+        // 這裡只負責更新文字與樣式，顯示/隱藏由 handlers.js 控制 (或者在此統一控制亦可，為免衝突保持現狀或在此補強)
+        if (hasQuestions) {
+            elements.regenerateBtn.innerHTML = refreshIcon + '重新生成';
+        } else {
+            elements.regenerateBtn.innerHTML = playIcon + '開始出題';
+        }
+        
+        // 確保顯示邏輯一致
+        if (hasContent) {
+            elements.regenerateBtn.classList.remove('hidden');
+        } else {
+            elements.regenerateBtn.classList.add('hidden');
+        }
     }
 
-    const refreshIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10 10a1 1 0 01-1 1H5a1 1 0 110-2h5.001a5.002 5.002 0 004.087-7.885 1 1 0 111.732-1.001A7.002 7.002 0 0114 12z" clip-rule="evenodd" /></svg>`;
-    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
-
-    if (isAutoMode) {
+    // 2. 控制右側「下載/重置」區塊 (preview-actions)
+    // 邏輯：只有在題目生成完畢 (questions > 0) 時才顯示。
+    const previewActions = document.getElementById('preview-actions');
+    if (previewActions) {
         if (state.getGeneratedQuestions().length > 0) {
             previewActions.classList.remove('hidden');
-            elements.regenerateBtn.classList.remove('themed-button-primary');
-            elements.regenerateBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
-            elements.regenerateBtn.innerHTML = refreshIcon + '手動更新';
         } else {
             previewActions.classList.add('hidden');
-        }
-    } else {
-        if (hasContent) {
-            previewActions.classList.remove('hidden');
-            elements.regenerateBtn.classList.add('themed-button-primary');
-            elements.regenerateBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
-            
-            if (state.getGeneratedQuestions().length > 0) {
-                elements.regenerateBtn.innerHTML = refreshIcon + '重新生成';
-            } else {
-                elements.regenerateBtn.innerHTML = playIcon + '開始出題';
-            }
-        } else {
-             previewActions.classList.add('hidden');
         }
     }
 }
@@ -259,13 +257,25 @@ export function populateVersionHistory() {
     const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.3 體驗優化';
+    const currentDisplayVersion = 'v8.4 介面更新';
     if (elements.versionBtn) elements.versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.3 體驗優化",
+            version: "v8.4 介面更新",
             current: true,
+            notes: [
+                "【✨ 介面優化】",
+                " - 調整「開始出題」按鈕位置至題目設定區塊底部，並配合布景主題配色。",
+                " - 新增「重置」按鈕，並改為紅色以提示其清除功能。",
+                " - 「下載題庫檔案」與「重置」按鈕僅在生成題目後才顯示，使流程更清晰。",
+                " - 移除「啟用自動出題」設定，簡化出題流程為手動觸發。",
+                " - 優化預覽區空白狀態顯示，移除不合時宜文字並新增引導圖示。"
+            ]
+        },
+        {
+            version: "v8.3 體驗優化",
+            current: false, // Update to false as v8.4 is current
             notes: [
                 "【🚀 新功能】",
                 " - 新增「PDF 考卷 (A4)」與「純文字檔 (.txt)」匯出格式。",
