@@ -955,6 +955,112 @@ export async function exportFile() {
                     XLSX.writeFile(wb, `${safeTitle}_Kahoot.xlsx`);
                     success = true;
                     break;
+                case 'blooket':
+                    // Blooket CSV Format
+                    // Header 1: "Blooket\nImport Template",,,,,,, (Note: The example shows a multi-line cell or just text)
+                    // Let's replicate the structure exactly.
+                    let csvContentBlooket = '"Blooket\nImport Template",,,,,,,';
+                    csvContentBlooket += '\nQuestion #,Question Text,Answer 1,Answer 2,"Answer 3\n(Optional)","Answer 4\n(Optional)","Time Limit (sec)\n(Max: 300 seconds)","Correct Answer(s)\n(Only include Answer #)"';
+                    
+                    standardMCQs.forEach((q, index) => {
+                        // Options: Ensure we have exactly 4 slots, empty if missing
+                        const opts = [...(q.options || [])];
+                        while(opts.length < 4) opts.push('');
+                        
+                        // Correct Answer: 1-based index
+                        // If multiple correct answers (rare for this format usually), join with comma? The header says "Answer #" so "1" or "2" etc.
+                        // Assuming single correct answer for now or taking the first one if multiple to be safe, though header implies "(s)".
+                        // Let's support multiple:
+                        const correctIndices = (q.correct || []).map(i => i + 1).join(','); 
+
+                        // Escape quotes in text
+                        const escapeCsv = (str) => {
+                            if (typeof str !== 'string') return '';
+                            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                return `"${str.replace(/"/g, '""')}"`;
+                            }
+                            return str;
+                        };
+
+                        const row = [
+                            index + 1,
+                            escapeCsv(q.text),
+                            escapeCsv(opts[0]),
+                            escapeCsv(opts[1]),
+                            escapeCsv(opts[2]),
+                            escapeCsv(opts[3]),
+                            q.time || 20, // Default 20s as per example
+                            `"${correctIndices}"` // Force quote for correct answer column to match example style if multiple
+                        ];
+                        csvContentBlooket += '\n' + row.join(',');
+                    });
+
+                    const blobBlooket = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContentBlooket], { type: 'text/csv;charset=utf-8;' });
+                    const urlBlooket = URL.createObjectURL(blobBlooket);
+                    const aBlooket = document.createElement('a');
+                    aBlooket.href = urlBlooket;
+                    aBlooket.download = `${safeTitle}_Blooket.csv`;
+                    document.body.appendChild(aBlooket);
+                    aBlooket.click();
+                    document.body.removeChild(aBlooket);
+                    success = true;
+                    break;
+                case 'gimkit':
+                    // Gimkit CSV Format
+                    // Header 1: Gimkit Spreadsheet Import Template,,,,
+                    // Header 2: Question,Correct Answer,Incorrect Answer 1,Incorrect Answer 2 (Optional),Incorrect Answer 3 (Optional)
+                    let csvContentGimkit = 'Gimkit Spreadsheet Import Template,,,,';
+                    csvContentGimkit += '\nQuestion,Correct Answer,Incorrect Answer 1,Incorrect Answer 2 (Optional),Incorrect Answer 3 (Optional)';
+
+                    standardMCQs.forEach(q => {
+                        // Logic: Identify correct answer vs incorrect answers
+                        // Gimkit expects 1 correct answer in column 2.
+                        // If we have multiple correct answers, we might have to pick the first one or this format doesn't support it well.
+                        // We will take the first correct answer.
+                        const correctIndex = (q.correct && q.correct.length > 0) ? q.correct[0] : -1;
+                        let correctAnswerText = '';
+                        let incorrectAnswers = [];
+
+                        if (correctIndex !== -1 && q.options && q.options[correctIndex]) {
+                            correctAnswerText = q.options[correctIndex];
+                            // Filter out the correct one to get incorrect ones
+                            incorrectAnswers = q.options.filter((_, idx) => idx !== correctIndex);
+                        } else {
+                            // Fallback if no correct answer defined
+                            incorrectAnswers = q.options || [];
+                        }
+
+                        // Ensure we have at least 3 incorrect slots for the CSV columns (though optional, good to fill if exist)
+                        // The loop will just iterate what we have.
+                        
+                        const escapeCsv = (str) => {
+                            if (typeof str !== 'string') return '';
+                            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                return `"${str.replace(/"/g, '""')}"`;
+                            }
+                            return str;
+                        };
+
+                        const row = [
+                            escapeCsv(q.text),
+                            escapeCsv(correctAnswerText),
+                            escapeCsv(incorrectAnswers[0] || ''),
+                            escapeCsv(incorrectAnswers[1] || ''),
+                            escapeCsv(incorrectAnswers[2] || '')
+                        ];
+                        csvContentGimkit += '\n' + row.join(',');
+                    });
+
+                    const blobGimkit = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContentGimkit], { type: 'text/csv;charset=utf-8;' });
+                    const urlGimkit = URL.createObjectURL(blobGimkit);
+                    const aGimkit = document.createElement('a');
+                    aGimkit.href = urlGimkit;
+                    aGimkit.download = `${safeTitle}_Gimkit.csv`;
+                    document.body.appendChild(aGimkit);
+                    aGimkit.click();
+                    document.body.removeChild(aGimkit);
+                    success = true;
+                    break;
                 case 'wayground':
                     data = standardMCQs.map(q => ({
                         'Question Text': q.text, 'Question Type': (q.correct || []).length > 1 ? 'Checkbox' : 'Multiple Choice', 'Option 1': q.options[0] || '', 'Option 2': q.options[1] || '', 'Option 3': q.options[2] || '', 'Option 4': q.options[3] || '', 'Option 5': '', 'Correct Answer': (q.correct || []).map(i => i + 1).join(','), 'Time in seconds': q.time || 30, 'Image Link': '', 'Answer explanation': q.explanation || ''

@@ -257,13 +257,24 @@ export function populateVersionHistory() {
     const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.4 介面更新';
+    const currentDisplayVersion = 'v8.5 版本修正歷程';
     if (elements.versionBtn) elements.versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.4 介面更新",
+            version: "v8.5 (2025/12/12)",
             current: true,
+            notes: [
+                "【🚀 新功能】",
+                " - 新增支援 **Blooket** 平台 CSV 格式匯出。",
+                " - 新增支援 **Gimkit** 平台 CSV 格式匯出。",
+                "【✨ 優化】",
+                " - 調整匯出格式選單順序，將 Wayground 選項前移。",
+            ]
+        },
+        {
+            version: "v8.4 介面更新",
+            current: false,
             notes: [
                 "【✨ 介面優化】",
                 " - 調整「開始出題」按鈕位置至題目設定區塊底部，並配合布景主題配色。",
