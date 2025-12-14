@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { showToast, stopKeyTimer } from './ui.js';
+import { showToast, stopKeyTimer, t } from './ui.js';
 import { elements } from './dom.js'; // Use centralized DOM elements
 import { getQuestionSystemInstruction, getQuestionUserPrompt } from './prompts.js'; // Import prompt builders
 import { parseGeminiError } from './utils.js'; // Import error parser
@@ -48,7 +48,7 @@ export function getApiKey() {
         sessionStorage.removeItem('gemini_api_key_data');
         stopKeyTimer();
         if (document.body.contains(document.getElementById('toast'))) {
-           showToast('API Key 已過期，請重新輸入。', 'error');
+           showToast(t('error_api_expired'), 'error');
         }
         return null;
     }
@@ -60,11 +60,12 @@ export function getApiKey() {
  */
 export async function generateSingleBatch(questionsInBatch, questionType, difficulty, text, images, questionStyle, signal, languageChoice, studentLevel) {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key not available.");
+    if (!apiKey) throw new Error(t('error_api_missing'));
 
     const apiUrl = CONFIG.API_URL;
     const selectedFormat = elements.formatSelect ? elements.formatSelect.value : '';
     const needsExplanation = selectedFormat === 'loilonote' || selectedFormat === 'wayground';
+    const interfaceLanguage = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
 
     // 如果 studentLevelSelect 存在，優先使用選單文字，否則使用傳入的 studentLevel 代碼
     const studentGradeText = elements.studentLevelSelect && elements.studentLevelSelect.selectedIndex >= 0
@@ -72,7 +73,7 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
         : studentLevel;
 
     // 1. 構建 System Instruction (來自 prompts.js)
-    const systemPromptText = getQuestionSystemInstruction(questionStyle, studentGradeText);
+    const systemPromptText = getQuestionSystemInstruction(questionStyle, studentGradeText, interfaceLanguage);
 
     // 2. 構建 JSON Schema (定義輸出結構)
     let jsonSchema;
@@ -113,7 +114,8 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
         type: questionType,
         difficulty,
         text: "", // 這裡不傳 text，因為 text 會作為獨立的 part 傳入，避免 prompt 過長
-        language: languageChoice
+        language: languageChoice,
+        interfaceLanguage
     });
 
     const parts = [{ text: userPromptText }];
@@ -151,17 +153,17 @@ export async function generateSingleBatch(questionsInBatch, questionType, diffic
     
     // 檢查是否有被 Safety Filter 攔截 (finishReason)
     if (result.candidates?.[0]?.finishReason === 'SAFETY') {
-        throw new Error(parseGeminiError(new Error('SAFETY')));
+        throw new Error(t('error_safety_filter'));
     }
 
-    if (!jsonText) throw new Error('API 回應格式錯誤，請嘗試減少題目數量或調整內容後再試。');
+    if (!jsonText) throw new Error(t('error_api_format'));
 
     let parsedJson;
     try {
         parsedJson = JSON.parse(jsonText);
     } catch (e) {
         console.error("解析 JSON 失敗:", jsonText);
-        throw new Error('API 回應了無效的 JSON 格式，請嘗試減少題目數量。');
+        throw new Error(t('error_api_json'));
     }
 
     return parsedJson.map(q => {

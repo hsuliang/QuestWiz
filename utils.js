@@ -33,7 +33,7 @@ export function isEnglish(text) {
     if (!text || text.length < 20) return false; 
     const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
     const ratio = englishChars / text.length;
-    return ratio > 0.7;
+    return ratio > 0.5;
 }
 
 /**

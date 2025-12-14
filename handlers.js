@@ -108,7 +108,7 @@ export function restoreDraft() {
 
                 // 簡單判斷是否有恢復內容
                 if (inputs.textInput || inputs.topicInput || (stateDraft && stateDraft.generatedQuestions.length > 0)) {
-                    ui.showToast('已恢復上次未完成的草稿', 'success');
+                    ui.showToast(ui.t('toast_restored'), 'success');
                     ui.updateRegenerateButtonState();
                     
                     // 根據內容切換 Tab (簡單邏輯)
@@ -168,7 +168,7 @@ function loadScript(src) {
 export function buildContentPrompt() {
     const topic = elements.topicInput ? elements.topicInput.value : '';
     if (!topic.trim()) {
-        ui.showToast('請輸入一個主題、單字或語詞！', 'error');
+        ui.showToast(ui.t('toast_enter_topic'), 'error');
         return null;
     }
 
@@ -176,7 +176,7 @@ export function buildContentPrompt() {
     const tone = elements.toneSelect.value === 'custom' ? elements.customToneInput.value.trim() : elements.toneSelect.value;
 
     if ((elements.textTypeSelect.value === 'custom' && !textType) || (elements.toneSelect.value === 'custom' && !tone)) {
-        ui.showToast('「自訂」選項的內容不能為空！', 'error');
+        ui.showToast(ui.t('toast_custom_empty'), 'error');
         return null;
     }
     
@@ -185,7 +185,11 @@ export function buildContentPrompt() {
     const learningObjectives = elements.learningObjectivesInput ? elements.learningObjectivesInput.value : '';
     const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
     const wordCount = wordCountMap[studentLevel];
+    const interfaceLanguage = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
     
+    // 偵測主題是否為英文
+    const isTargetEnglish = isEnglish(topic);
+
     // 使用 prompts.js 生成提示詞
     return getContentSystemInstruction({
         topic,
@@ -193,7 +197,9 @@ export function buildContentPrompt() {
         tone,
         studentGradeText,
         wordCount,
-        learningObjectives
+        learningObjectives,
+        interfaceLanguage,
+        isTargetEnglish
     });
 }
 
@@ -204,12 +210,12 @@ export function buildContentPrompt() {
 export async function callGeminiForContent(promptString) {
     const apiKey = getApiKey();
     if (!apiKey) {
-        return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
+        return ui.showToast(ui.t('error_api_missing'), 'error');
     }
 
     // 智慧載入狀態：開始輪播訊息
     let messageIndex = 0;
-    ui.showLoader(contentLoadingMessages[0]);
+    ui.showLoader(contentLoadingMessages[0]); // Need to make this dynamic too, but skip for now
     const loaderInterval = setInterval(() => {
         messageIndex = (messageIndex + 1) % contentLoadingMessages.length;
         ui.showLoader(contentLoadingMessages[messageIndex]);
@@ -243,7 +249,7 @@ export async function callGeminiForContent(promptString) {
         if (generatedText) {
             elements.textInput.value = generatedText;
             saveInputDraft(); // 生成後立即儲存
-            ui.showToast('學習內文已成功生成！', 'success');
+            ui.showToast(ui.t('toast_content_generated'), 'success');
             if (elements.downloadTxtBtn) elements.downloadTxtBtn.classList.remove('hidden');
             if (elements.shareContentBtn) elements.shareContentBtn.classList.remove('hidden');
             
@@ -253,7 +259,7 @@ export async function callGeminiForContent(promptString) {
             if (elements.questionStyleSelect) elements.questionStyleSelect.value = 'competency-based';
             triggerOrUpdate();
         } else { 
-            throw new Error('AI未能生成內容，請檢查您的 API Key 或稍後再試。'); 
+            throw new Error(ui.t('error_generate_fail')); 
         }
     } catch (error) {
         console.error('生成內文時發生錯誤:', error);
@@ -270,7 +276,7 @@ export async function callGeminiForContent(promptString) {
 export function generateContentFromTopic() {
     // Validate Student Level
     if (!elements.studentLevelSelect.value) {
-        ui.showToast('請先選擇學生程度！', 'error');
+        ui.showToast(ui.t('toast_select_level'), 'error');
         if(elements.studentLevelSelectContent) {
              elements.studentLevelSelectContent.focus();
              elements.studentLevelSelectContent.classList.add('input-error');
@@ -293,7 +299,7 @@ export function generateContentFromTopic() {
 export function handlePreviewPrompt() {
     // Validate Student Level for prompt preview as well
     if (!elements.studentLevelSelect.value) {
-        ui.showToast('請先選擇學生程度！', 'error');
+        ui.showToast(ui.t('toast_select_level'), 'error');
         if(elements.studentLevelSelectContent) {
              elements.studentLevelSelectContent.focus();
              elements.studentLevelSelectContent.classList.add('input-error');
@@ -316,14 +322,14 @@ export function handleCopyPrompt() {
     if (!elements.promptDisplayArea) return;
     const textToCopy = elements.promptDisplayArea.value;
     if (!textToCopy.trim()) {
-        ui.showToast('沒有內容可以複製！', 'error');
+        ui.showToast(ui.t('toast_copy_fail'), 'error'); // Using copy fail as generic empty here or create new key
         return;
     }
     navigator.clipboard.writeText(textToCopy)
-        .then(() => ui.showToast('提示詞已成功複製！', 'success'))
+        .then(() => ui.showToast(ui.t('toast_copy_prompt_success'), 'success'))
         .catch(err => {
             console.error('複製失敗:', err);
-            ui.showToast('無法複製內容。', 'error');
+            ui.showToast(ui.t('toast_copy_fail'), 'error');
         });
 }
 
@@ -334,7 +340,7 @@ export function handleGenerateWithEditedPrompt() {
     if (!elements.promptDisplayArea) return;
     const finalPrompt = elements.promptDisplayArea.value;
     if (!finalPrompt.trim()) {
-        ui.showToast('提示詞內容不能為空！', 'error');
+        ui.showToast(ui.t('toast_custom_empty'), 'error'); // Reusing empty custom toast or create new
         return;
     }
     ui.hidePromptModal();
@@ -347,7 +353,7 @@ export function handleGenerateWithEditedPrompt() {
 export function handleDownloadTxt() {
     const textToSave = elements.textInput.value;
     if (!textToSave.trim()) {
-        return ui.showToast('沒有內容可以下載！', 'error');
+        return ui.showToast(ui.t('toast_no_content_download'), 'error');
     }
     const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -366,7 +372,7 @@ export function handleDownloadTxt() {
 export async function handleShareContent() {
     const textToShare = elements.textInput.value;
     if (!textToShare.trim()) {
-        return ui.showToast('沒有內容可以分享！', 'error');
+        return ui.showToast(ui.t('toast_no_content_share'), 'error');
     }
 
     ui.showLoader('正在產生分享連結...');
@@ -407,7 +413,7 @@ export async function handleShareContent() {
 
     } catch (error) {
         console.error('分享失敗:', error);
-        ui.showToast('分享失敗，請檢查後端服務或網路連線。', 'error');
+        ui.showToast(ui.t('toast_export_fail'), 'error'); // Using generic export fail or share fail
     } finally {
         ui.hideLoader();
     }
@@ -420,8 +426,8 @@ export function handleCopyLink() {
     const shareLinkInput = document.getElementById('share-link-input'); 
     if (shareLinkInput && shareLinkInput.value) {
         navigator.clipboard.writeText(shareLinkInput.value)
-            .then(() => ui.showToast('連結已成功複製！', 'success'))
-            .catch(() => ui.showToast('複製失敗。', 'error'));
+            .then(() => ui.showToast(ui.t('toast_copy_link_success'), 'success'))
+            .catch(() => ui.showToast(ui.t('toast_copy_fail'), 'error'));
     }
 }
 
@@ -433,13 +439,13 @@ export async function handleExtractFromUrl() {
     const isYouTube = elements.urlTypeWebRadio ? !elements.urlTypeWebRadio.checked : false;
     
     if (!url) {
-        return ui.showToast('請輸入網址！', 'error');
+        return ui.showToast(ui.t('toast_no_url'), 'error');
     }
     
     try {
         new URL(url);
     } catch (_) {
-        return ui.showToast('網址格式不正確！', 'error');
+        return ui.showToast(ui.t('toast_invalid_url'), 'error');
     }
 
     const endpoint = isYouTube ? CONFIG.GET_YOUTUBE_TRANSCRIPT_URL : CONFIG.EXTRACT_URL_FUNCTION_URL;
@@ -464,12 +470,12 @@ export async function handleExtractFromUrl() {
         if (isYouTube) {
             fullText = result.transcript;
         } else {
-            fullText = `標題：${result.title}\n\n內文：\n${result.content}`;
+            fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
         }
         
         elements.textInput.value = fullText;
         saveInputDraft(); // 擷取後立即儲存
-        ui.showToast('內容擷取成功！', 'success');
+        ui.showToast(ui.t('toast_content_extracted'), 'success');
         
         if (elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
 
@@ -517,7 +523,7 @@ export const debouncedGenerate = debounce(checkContentAndToggleButton, CONFIG.DE
 export async function triggerQuestionGeneration() {
     // Validate Student Level
     if (!elements.studentLevelSelect.value) {
-        ui.showToast('請先選擇學生程度！', 'error');
+        ui.showToast(ui.t('toast_select_level'), 'error');
         if(elements.studentLevelSelectQuiz) {
              elements.studentLevelSelectQuiz.focus();
              elements.studentLevelSelectQuiz.classList.add('input-error');
@@ -530,7 +536,7 @@ export async function triggerQuestionGeneration() {
 
     // Validate Export Format
     if (!elements.formatSelect.value) {
-        ui.showToast('請先選擇匯出格式！', 'error');
+        ui.showToast(ui.t('toast_select_format'), 'error');
         elements.formatSelect.focus();
         elements.formatSelect.classList.add('input-error');
         setTimeout(() => elements.formatSelect.classList.remove('input-error'), 2000);
@@ -539,7 +545,7 @@ export async function triggerQuestionGeneration() {
 
     const tabImage = elements.tabs.input.buttons[1];
     if (tabImage && tabImage.classList.contains('active') && state.getUploadedImages().length === 0) {
-        return ui.showToast('請先上傳圖片！', 'error');
+        return ui.showToast(ui.t('toast_upload_img_first'), 'error');
     }
     const text = elements.textInput ? elements.textInput.value : '';
     if (!text.trim() && state.getUploadedImages().length === 0) return;
@@ -561,7 +567,7 @@ export async function triggerQuestionGeneration() {
 async function proceedWithGeneration(languageChoice) {
     const apiKey = getApiKey();
     if (!apiKey) {
-        return ui.showToast('請先在「常用設定」中輸入您的 Gemini API Key！', 'error');
+        return ui.showToast(ui.t('error_api_missing'), 'error');
     }
     const text = elements.textInput ? elements.textInput.value : '';
     const totalQuestions = elements.numQuestionsInput ? parseInt(elements.numQuestionsInput.value, 10) : 0;
@@ -608,7 +614,7 @@ async function proceedWithGeneration(languageChoice) {
             ui.renderQuestionsForEditing(state.getGeneratedQuestions());
             ui.initializeSortable();
         } else {
-            throw new Error("AI 未能生成任何題目，請檢查您的輸入內容或稍後再試。");
+            throw new Error(ui.t('error_question_fail'));
         }
     } catch(error) {
          if (error.name === 'AbortError') {
@@ -618,11 +624,11 @@ async function proceedWithGeneration(languageChoice) {
          console.error('生成題目時發生錯誤:', error);
          let userFriendlyMessage = error.message;
          if (error.message.includes('503')) {
-             userFriendlyMessage = "伺服器目前忙碌中(503)，已自動重試但仍失敗，請稍後再試或減少單次題目數量。";
+             userFriendlyMessage = ui.t('error_server_busy');
          } else if (error.message.includes('400')) {
-             userFriendlyMessage = "請求內容可能有問題(400)，請檢查您的輸入文字或 API Key。";
+             userFriendlyMessage = ui.t('error_bad_request');
          } else if (error.message.includes('Failed to fetch')) {
-             userFriendlyMessage = "網路連線失敗，請檢查您的網路設定。";
+             userFriendlyMessage = ui.t('error_network');
          }
          ui.showToast(userFriendlyMessage, 'error');
          if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
@@ -639,8 +645,8 @@ export function handleFile(file) {
     if (elements.fileNameDisplay) elements.fileNameDisplay.textContent = ''; 
     if (elements.fileInput) elements.fileInput.value = '';
     if (!file) return;
-    if (file.type !== 'application/pdf' && file.type !== 'text/plain') { const errorMsg = '檔案格式不支援。'; ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
-    if (file.size > CONFIG.MAX_FILE_SIZE_BYTES) { const errorMsg = `檔案過大 (${(CONFIG.MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB上限)。`; ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
+    if (file.type !== 'application/pdf' && file.type !== 'text/plain') { const errorMsg = ui.t('error_file_format'); ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
+    if (file.size > CONFIG.MAX_FILE_SIZE_BYTES) { const errorMsg = `${ui.t('error_file_size')} (${(CONFIG.MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB).`; ui.showToast(errorMsg, 'error'); if(elements.fileErrorDisplay) elements.fileErrorDisplay.textContent = errorMsg; return; }
     if (elements.fileNameDisplay) elements.fileNameDisplay.textContent = `已選：${file.name}`;
     const reader = new FileReader();
     if (file.type === 'application/pdf') {
@@ -662,7 +668,7 @@ export function handleFile(file) {
                 }
                 if(elements.textInput) elements.textInput.value = text; 
                 saveInputDraft(); // 讀取後立即儲存
-                ui.showToast('PDF 讀取成功！', 'success'); 
+                ui.showToast(ui.t('toast_pdf_success'), 'success'); 
                 if(elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
                 triggerOrUpdate();
             } catch (error) { 
@@ -680,7 +686,7 @@ export function handleFile(file) {
         reader.onload = (e) => { 
             if(elements.textInput) elements.textInput.value = e.target.result; 
             saveInputDraft(); // 讀取後立即儲存
-            ui.showToast('文字檔讀取成功！', 'success'); 
+            ui.showToast(ui.t('toast_txt_success'), 'success'); 
             if(elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
             triggerOrUpdate(); 
         };
@@ -700,7 +706,7 @@ export function handleImageFiles(newFiles) {
         if (currentTotalSize + file.size > MAX_TOTAL_IMAGE_SIZE_BYTES) { if (!sizeLimitReached) { errorMessages.push(`圖片總量超過上限。`); sizeLimitReached = true; } return false; }
         currentTotalSize += file.size; return true;
     });
-    if (errorMessages.length > 0) { if(elements.imageErrorDisplay) elements.imageErrorDisplay.innerHTML = errorMessages.join('<br>'); ui.showToast('部分圖片上傳失敗。', 'error'); }
+    if (errorMessages.length > 0) { if(elements.imageErrorDisplay) elements.imageErrorDisplay.innerHTML = errorMessages.join('<br>'); ui.showToast(ui.t('toast_img_fail_partial'), 'error'); }
     if (validFiles.length === 0) { if(elements.imageInput) elements.imageInput.value = ''; return; }
     
     const fragment = document.createDocumentFragment();
@@ -774,8 +780,8 @@ export function handleImageFiles(newFiles) {
 export async function exportFile() {
     const questions = state.getGeneratedQuestions();
     const format = elements.formatSelect ? elements.formatSelect.value : '';
-    if (!format) return ui.showToast('請選擇匯出檔案格式！', 'error');
-    if (!questions || questions.length === 0) return ui.showToast('沒有可匯出的題目！', 'error');
+    if (!format) return ui.showToast(ui.t('toast_select_format'), 'error');
+    if (!questions || questions.length === 0) return ui.showToast(ui.t('toast_no_questions'), 'error');
     
     const titleInput = elements.quizTitleInput ? elements.quizTitleInput.value.trim() : '';
     const title = titleInput || '測驗卷';
@@ -1087,7 +1093,7 @@ export async function exportFile() {
         }
     } catch (error) { 
         console.error('匯出失敗:', error); 
-        ui.showToast('匯出失敗，請檢查主控台錯誤。', 'error'); 
+        ui.showToast(ui.t('toast_export_fail'), 'error'); 
     } finally {
         ui.hideLoader();
     }
@@ -1140,5 +1146,5 @@ export function clearAllInputs() {
     state.clearDraftState(); // 清除 state 草稿
 
     checkContentAndToggleButton(); // 更新按鈕顯示狀態
-    ui.showToast('內容已全部清除！', 'success');
+    ui.showToast(ui.t('toast_cleared'), 'success');
 }

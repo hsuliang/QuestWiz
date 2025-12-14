@@ -4,6 +4,8 @@ import { triggerQuestionGeneration } from './handlers.js';
 import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js'; // 引入 DOM 模組
 
+import { translations } from './translations.js';
+
 /**
  * 顯示提示訊息 (Toast)
  */
@@ -79,11 +81,13 @@ export function updateRegenerateButtonState() {
         const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
 
         // 更新按鈕文字：若已有題目則顯示「重新生成」，否則顯示「開始出題」
-        // 這裡只負責更新文字與樣式，顯示/隱藏由 handlers.js 控制 (或者在此統一控制亦可，為免衝突保持現狀或在此補強)
+        const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+        const t = translations[currentLang];
+        
         if (hasQuestions) {
-            elements.regenerateBtn.innerHTML = refreshIcon + '重新生成';
+            elements.regenerateBtn.innerHTML = refreshIcon + (t ? t.regenerate_btn : '重新生成');
         } else {
-            elements.regenerateBtn.innerHTML = playIcon + '開始出題';
+            elements.regenerateBtn.innerHTML = playIcon + (t ? t.generate_btn : '開始出題');
         }
         
         // 確保顯示邏輯一致
@@ -158,7 +162,7 @@ export function renderQuestionsForEditing(questions) {
                 <div class="relative flex items-center group">
                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm-.707 10.607a1 1 0 011.414 0l.707-.707a1 1 0 111.414 1.414l-.707.707a1 1 0 01-1.414 0zM4 11a1 1 0 100-2H3a1 1 0 100 2h1z" /></svg>
                     <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-gray-800 text-white text-sm rounded-lg shadow-lg z-10 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-200">
-                        <h5 class="font-bold mb-1 border-b border-gray-600 pb-1">AI 設計理念</h5>
+                        <h5 class="font-bold mb-1 border-b border-gray-600 pb-1">${t('ai_insight_title')}</h5>
                         <p class="text-xs">${questionData.design_concept}</p>
                     </div>
                 </div>`;
@@ -171,11 +175,11 @@ export function renderQuestionsForEditing(questions) {
             <div class="flex-grow">
                 <div class="flex justify-between items-start mb-3">
                     <div class="flex items-center space-x-2">
-                         <p class="text-sm font-bold themed-accent-text">第 ${index + 1} 題</p>
+                         <p class="text-sm font-bold themed-accent-text">${t('question_prefix')} ${index + 1} ${t('question_suffix')}</p>
                          ${aiInsightHtml}
                     </div>
                     <div class="flex items-center space-x-2">
-                       <button class="copy-question-btn text-gray-400 hover:text-indigo-500 transition-colors" title="複製題目">
+                       <button class="copy-question-btn text-gray-400 hover:text-indigo-500 transition-colors" title="${t('toast_copy_success')}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                        </button>
                        <button class="delete-question-btn text-gray-400 hover:text-red-500 transition-colors" title="刪除題目">
@@ -185,11 +189,11 @@ export function renderQuestionsForEditing(questions) {
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">題目：</label>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">${t('question_label')}</label>
                         <textarea rows="2" class="question-text border border-gray-300 rounded-md p-2 w-full transition focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">${questionData.text}</textarea>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">選項 (點擊圓圈設為正解)：</label>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">${t('options_label')}</label>
                         <div class="space-y-2 options-container">${optionsHtml}</div>
                     </div>
                 </div>
@@ -204,7 +208,7 @@ export function renderQuestionsForEditing(questions) {
         card.querySelectorAll('.options-container input[type="text"]').forEach((optInput, optIndex) => { optInput.addEventListener('input', e => { currentQuestions[index].options[optIndex] = e.target.value; }); });
         card.querySelectorAll('.options-container input[type="radio"]').forEach(radio => { radio.addEventListener('change', e => { if (e.target.checked) { currentQuestions[index].correct = [parseInt(e.target.value, 10)]; } }); });
         card.querySelector('.delete-question-btn').addEventListener('click', () => { currentQuestions.splice(index, 1); state.setGeneratedQuestions(currentQuestions); renderQuestionsForEditing(currentQuestions); initializeSortable(); });
-        card.querySelector('.copy-question-btn').addEventListener('click', () => { const questionToCopy = JSON.parse(JSON.stringify(currentQuestions[index])); currentQuestions.splice(index + 1, 0, questionToCopy); state.setGeneratedQuestions(currentQuestions); renderQuestionsForEditing(currentQuestions); initializeSortable(); showToast('題目已成功複製！', 'success'); });
+        card.querySelector('.copy-question-btn').addEventListener('click', () => { const questionToCopy = JSON.parse(JSON.stringify(currentQuestions[index])); currentQuestions.splice(index + 1, 0, questionToCopy); state.setGeneratedQuestions(currentQuestions); renderQuestionsForEditing(currentQuestions); initializeSortable(); showToast(t('toast_copy_success'), 'success'); });
     });
 }
 
@@ -235,13 +239,15 @@ export function applyLayoutPreference() {
     if (!elements.mainContainer) return;
 
     const placeholderP = elements.previewPlaceholder;
+    const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    const t = translations[currentLang];
 
     if (preferredLayout === 'reversed') {
         elements.mainContainer.classList.add('lg:flex-row-reverse');
-        if (placeholderP) placeholderP.textContent = '請在右側提供內容並設定選項';
+        if (placeholderP && t) placeholderP.textContent = t.preview_placeholder_reversed;
     } else {
         elements.mainContainer.classList.remove('lg:flex-row-reverse');
-        if (placeholderP) placeholderP.textContent = '請在左側提供內容並設定選項';
+        if (placeholderP && t) placeholderP.textContent = t.preview_placeholder;
     }
 }
 
@@ -257,13 +263,23 @@ export function populateVersionHistory() {
     const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.5 版本修正歷程';
+    const currentDisplayVersion = 'v8.6 版本修正歷程';
     if (elements.versionBtn) elements.versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.5 (2025/12/12)",
+            version: "v8.6 (2025/12/14)",
             current: true,
+            notes: [
+                "【🌍 國際化支援】",
+                " - 新增「語言」設定分頁，支援 **繁體中文** 與 **English** 介面切換。",
+                " - AI 生成的題目與提示詞現在會根據介面語言自動調整。",
+                " - 錯誤訊息與提示文字全面支援多語言顯示。",
+            ]
+        },
+        {
+            version: "v8.5 (2025/12/12)",
+            current: false,
             notes: [
                 "【🚀 新功能】",
                 " - 新增支援 **Blooket** 平台 CSV 格式匯出。",
@@ -425,4 +441,87 @@ export function showShareModal() {
 }
 export function hideShareModal() {
     if (elements.shareModal) elements.shareModal.classList.add('hidden');
+}
+
+/**
+ * 更新介面語言
+ * @param {string} lang - 語言代碼 (zh-TW, en)
+ */
+export function updateLanguage(lang) {
+    if (!translations[lang]) return;
+
+    // 1. 更新所有帶有 data-i18n 的元素
+    const elementsToTranslate = document.querySelectorAll('[data-i18n]');
+    elementsToTranslate.forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+            el.textContent = translations[lang][key];
+        }
+    });
+
+    // 1.5. 更新帶有 data-i18n-html 的元素 (支援 HTML 內容)
+    const elementsToTranslateHtml = document.querySelectorAll('[data-i18n-html]');
+    elementsToTranslateHtml.forEach(el => {
+        const key = el.getAttribute('data-i18n-html');
+        if (translations[lang][key]) {
+            el.innerHTML = translations[lang][key];
+        }
+    });
+
+    // 2. 更新 placeholder (data-i18n-placeholder)
+    const placeholdersToTranslate = document.querySelectorAll('[data-i18n-placeholder]');
+    placeholdersToTranslate.forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (translations[lang][key]) {
+            el.placeholder = translations[lang][key];
+        }
+    });
+
+    // 3. 更新特定動態元素
+    // 更新「開始出題/重新生成」按鈕文字 (因為它會動態變化，我們存個狀態或在 updateRegenerateButtonState 裡處理)
+    updateRegenerateButtonState(); 
+
+    // 更新 Placeholder 文字 (左側/右側提示)
+    if (elements.previewPlaceholder) {
+        const isReversed = document.getElementById('main-container').classList.contains('lg:flex-row-reverse');
+        const key = isReversed ? 'preview_placeholder_reversed' : 'preview_placeholder';
+        elements.previewPlaceholder.textContent = translations[lang][key];
+    }
+    
+    // 4. 更新 HTML lang 屬性
+    document.documentElement.lang = lang;
+
+    // 5. 儲存設定
+    localStorage.setItem('quizGenLanguage_v1', lang);
+
+    // 6. 更新語言選單狀態
+    const radios = document.querySelectorAll('input[name="language"]');
+    radios.forEach(radio => {
+        if (radio.value === lang) radio.checked = true;
+    });
+}
+
+/**
+ * 初始化語言設定
+ */
+export function initLanguage() {
+    const savedLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    updateLanguage(savedLang);
+
+    const languageRadios = document.querySelectorAll('input[name="language"]');
+    languageRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            updateLanguage(e.target.value);
+        });
+    });
+}
+
+/**
+ * 取得目前語言的翻譯字串
+ * @param {string} key - 翻譯鍵值
+ * @returns {string} - 翻譯後的字串
+ */
+export function t(key) {
+    const lang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    return (translations[lang] && translations[lang][key]) ? translations[lang][key] : key;
 }

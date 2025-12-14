@@ -62,13 +62,15 @@ export const elements = {
                 document.getElementById('settings-tab-api'),
                 document.getElementById('settings-tab-level'),
                 document.getElementById('settings-tab-theme'),
-                document.getElementById('settings-tab-layout')
+                document.getElementById('settings-tab-layout'),
+                document.getElementById('settings-tab-language')
             ],
             contents: [
                 document.getElementById('settings-content-api'),
                 document.getElementById('settings-content-level'),
                 document.getElementById('settings-content-theme'),
-                document.getElementById('settings-content-layout')
+                document.getElementById('settings-content-layout'),
+                document.getElementById('settings-content-language')
             ]
         },
         input: {

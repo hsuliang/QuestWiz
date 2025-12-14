@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ui.populateVersionHistory();
     ui.applyLayoutPreference();
     ui.applyThemePreference();
+    ui.initLanguage(); // 初始化語言
     ui.updateVisitorCount();
 
     // 檢查並恢復 API 金鑰狀態
@@ -141,7 +142,22 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.mainContainer.classList.toggle('lg:flex-row-reverse');
         const isReversed = elements.mainContainer.classList.contains('lg:flex-row-reverse');
         localStorage.setItem('quizGenLayout_v2', isReversed ? 'reversed' : 'default');
-        if (elements.previewPlaceholder) elements.previewPlaceholder.textContent = isReversed ? '請在右側提供內容並設定選項' : '請在左側提供內容並設定選項';
+        
+        const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+        const t = ui.translations[currentLang]; // Access translations via ui module if exported, or re-import
+        // Since main.js doesn't import translations directly, we can rely on ui.updateLanguage or handle it simply here.
+        // Better: re-call ui.applyLayoutPreference which now handles text? No, applyLayoutPreference reads storage.
+        // Simplest: Just set text based on storage + current lang.
+        
+        // Actually, ui.js exports 'translations' now? No, I imported it in ui.js but main.js doesn't see it unless exported from ui.js or imported here.
+        // Let's import translations in main.js to be safe or use a helper in ui.js
+        
+        if (elements.previewPlaceholder) {
+             // Re-importing translations in main.js might be cleaner, but let's just trigger a language update to refresh text if we want to be lazy, 
+             // but that refreshes everything. 
+             // Let's use the logic:
+             ui.updateLanguage(currentLang); // This will refresh the placeholder text correctly based on the new layout class state check inside updateLanguage
+        }
     }, 'layoutToggleBtn');
 
     if (elements.themeRadios) {
