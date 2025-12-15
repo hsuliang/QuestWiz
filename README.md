@@ -120,6 +120,44 @@
 
 ---
 
+## 📋 提示詞設計備忘
+
+### 素養導向出題原則 (Competency-Based Design Principles)
+
+為確保 AI 生成真正的素養題，而非記憶題，提示詞設計重點如下：
+
+**繁體中文 (Chinese Version):**
+```javascript
+**【素養導向出題原則 (Competency-Based)】**
+1. **核心要求**：題目必須超越單純的記憶與理解，聚焦於「應用」、「分析」、「評鑑」等高層次認知能力。
+2. **強制情境化 (Mandatory Contextualization)**：
+   - 每道題目的「text」字段必須以**真實且具體的「情境描述」**開頭（例如：生活案例、新聞報導、圖表數據、實驗場景、對話等）。
+   - 情境描述應介於 50-100 字之間，用來引入核心問題。
+3. **避免記憶式問法 (Avoid Recall-Based Phrasing)**：
+   - 嚴禁使用「下列何者為...」、「...的定義為何？」、「...的特徵不包含？」等直接詢問定義、事實或列舉的句型。
+   - 問題部分應引導學生在情境中運用知識進行判斷、推論或解決問題。例如：「根據上述情境，如果您是...會如何判斷？」、「在此情況下，最合理的解釋是？」、「請分析此現象可能的原因/影響。」
+4. **整合運用 (Integration)**：鼓勵學生將文本知識與情境結合解決問題，而非僅是提取資訊。
+5. **設計理念 (Design Concept)**：每題必須附上 20-50 字的「設計理念」，說明此題考察的核心素養或能力。
+6. **學生程度**：請根據「${studentLevel}」的認知水平調整題目的難度與情境複雜度。
+```
+
+**英文 (English Version):**
+```javascript
+**【Competency-Based Design Principles】**
+1. **Core Requirement**: Questions must go beyond simple memorization and comprehension, focusing on higher-order cognitive abilities such as "Application", "Analysis", and "Evaluation".
+2. **Mandatory Contextualization**:
+   - The "text" field of each question must begin with a **realistic and specific "scenario description"** (e.g., real-life cases, news reports, data charts, experimental settings, dialogues).
+   - The scenario description should be between 50-100 words, serving to introduce the core question.
+3. **Avoid Recall-Based Phrasing**:
+   - Strictly prohibit direct recall-based question types like "Which of the following is...", "What is the definition of...", "Which of the following is NOT a characteristic of...".
+   - The question part should guide students to apply knowledge within the scenario to make judgments, inferences, or solve problems. For example: "Based on the above scenario, how would you determine/judge if you were...?", "In this situation, what is the most reasonable explanation for...?", "Analyze the possible causes/impacts of this phenomenon."
+4. **Integration**: Encourage students to apply knowledge from the text to solve problems within the given context, rather than merely extracting information.
+5. **Design Concept**: Each question must include a 20-50 word "Design Concept" explaining the core competency or skill being tested.
+6. **Student Level**: Adjust difficulty and scenario complexity for "${studentLevel}" cognitive level.
+```
+
+---
+
 <div align="center">
 
 ## 🏁 結語
