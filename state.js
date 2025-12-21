@@ -6,6 +6,7 @@ let uploadedImages = [];
 let keyTimerInterval = null;
 let currentRequestController = null; // 用於儲存當前 API 請求的 AbortController
 let sortableInstance = null; // 用於儲存 SortableJS 實例
+let isAdmin = false; // [新增] 管理員模式旗標
 
 // --- Getter / Setter ---
 
@@ -49,6 +50,14 @@ export function getSortableInstance() {
 
 export function setSortableInstance(instance) {
     sortableInstance = instance;
+}
+
+export function setAdminMode(status) {
+    isAdmin = !!status; // 確保是布林值
+}
+
+export function isAdminMode() {
+    return isAdmin;
 }
 
 // --- 草稿儲存邏輯 ---

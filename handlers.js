@@ -5,9 +5,177 @@ import * as ui from './ui.js';
 import * as utils from './utils.js'; // Changed to namespace import
 import { elements } from './dom.js';
 import { getContentSystemInstruction } from './prompts.js'; // Import prompt builder
+import { uploadQuizToLibrary, fetchQuizzes, incrementDownloadCount, deleteQuiz } from './db.js'; // 引入資料庫函式
 
 // Destructure what's needed for direct use, but keep 'utils' for namespace access
 const { isEnglish, debounce, isAutoGenerateEnabled, compressImage } = utils;
+
+// --- 題庫與上傳相關 Handlers ---
+
+// 1. 處理題庫大廳分頁點擊
+export async function handleCommunityTabClick() {
+    // 切換 UI 到題庫分頁
+    ui.switchWorkTab('library');
+    
+    // 如果列表是空的，則載入初始資料
+    if (elements.libQuizList && elements.libQuizList.children.length <= 1) { 
+        await refreshLibrary();
+    }
+}
+
+// 處理右側工作區分頁切換
+export function handleWorkTabClick(tabId) {
+    ui.switchWorkTab(tabId);
+    if (tabId === 'library') {
+        refreshLibrary();
+    }
+}
+
+// 2. 處理開啟上傳視窗
+export function handleUploadModalOpen() {
+    const questions = state.getGeneratedQuestions();
+    if (!questions || questions.length === 0) {
+        return ui.showToast("請先生成題目後再上傳！", "error");
+    }
+    ui.toggleUploadModal(true);
+}
+
+// 3. 處理送出上傳表單
+export async function handleUploadSubmit(e) {
+    e.preventDefault();
+    
+    // 檢查資料
+    const author = elements.uploadAuthor.value.trim();
+    const domain = elements.uploadDomain.value;
+    const grade = elements.uploadGrade.value;
+    const publisher = elements.uploadPublisher.value;
+    const unit = elements.uploadUnit.value.trim();
+    
+    if (!author || !domain || !grade || !unit || !publisher) {
+        return ui.showToast("請填寫所有必填欄位", "error");
+    }
+
+    const questions = state.getGeneratedQuestions();
+    if (!questions || questions.length === 0) return;
+
+    // 準備資料
+    const quizData = {
+        title: elements.quizTitleInput ? elements.quizTitleInput.value : unit,
+        unit: unit,
+        author: author,
+        domain: domain,
+        grade: Number(grade),
+        publisher: publisher,
+        issue: elements.uploadIssue ? elements.uploadIssue.value : '無',
+        questions: questions,
+        // [新增] 儲存生成設定與來源內容
+        settings: {
+            format: elements.formatSelect.value,
+            studentLevel: elements.studentLevelSelect.value,
+            difficulty: elements.difficultySelect.value,
+            questionType: elements.questionTypeSelect.value,
+            questionStyle: elements.questionStyleSelect.value,
+            numQuestions: elements.numQuestionsInput.value
+        },
+        sourceContext: {
+            sourceType: state.getUploadedImages().length > 0 ? 'image' : (elements.urlInput.value ? 'url' : 'text'),
+            content: state.getUploadedImages().length > 0 ? '圖片生成題目無法還原原始圖片' : (elements.urlInput.value || elements.textInput.value)
+        }
+    };
+
+    ui.showLoader("正在上傳到題庫...");
+    
+    try {
+        await uploadQuizToLibrary(quizData);
+        ui.showToast("上傳成功！感謝您的分享 ❤️", "success");
+        ui.toggleUploadModal(false);
+        // 清空表單
+        elements.uploadForm.reset();
+        // 重新整理列表
+        refreshLibrary();
+    } catch (error) {
+        console.error("上傳失敗:", error);
+        ui.showToast("上傳失敗，請稍後再試", "error");
+    } finally {
+        ui.hideLoader();
+    }
+}
+
+// 4. 處理篩選器變更
+export async function handleLibraryFilterChange() {
+    await refreshLibrary();
+}
+
+// 5. 執行重新整理列表
+async function refreshLibrary() {
+    ui.showLibraryLoader();
+    
+    const filters = {
+        domain: elements.libDomainSelect.value,
+        grade: elements.libGradeSelect.value,
+        issue: elements.libIssueSelect.value,
+        publisher: elements.libPublisherSelect.value
+    };
+
+    try {
+        const result = await fetchQuizzes(filters);
+        ui.renderLibraryQuizzes(result.quizzes, handleImportQuiz, handleDeleteQuiz);
+    } catch (error) {
+        console.error("載入題庫失敗:", error);
+        ui.showToast("無法載入題庫，請檢查網路連線", "error");
+    }
+}
+
+// 6. 處理匯入考卷
+export function handleImportQuiz(quiz) {
+    if (!quiz || !quiz.questions) return;
+    
+    if (confirm(`確定要匯入「${quiz.unit}」嗎？\n這將會覆蓋您目前編輯區的題目與設定。`)) {
+        // 1. 恢復題目
+        state.setGeneratedQuestions(quiz.questions);
+        ui.renderQuestionsForEditing(quiz.questions);
+        ui.initializeSortable();
+        
+        // 2. 恢復設定與來源內容 (如果存在)
+        if (quiz.settings && quiz.sourceContext) {
+            ui.applyImportedData(quiz);
+        } else {
+            // 對於舊資料，只填入標題
+            if (elements.quizTitleInput) {
+                elements.quizTitleInput.value = quiz.unit || quiz.title;
+            }
+        }
+        
+        // 3. 增加下載次數
+        if (quiz.id) {
+            incrementDownloadCount(quiz.id);
+        }
+
+        ui.showToast("匯入成功！", "success");
+        ui.updateRegenerateButtonState(); // 確保下載按鈕出現
+        
+        // 4. 自動切換回編輯 Tab
+        ui.switchWorkTab('edit');
+    }
+}
+
+// 7. [新增] 處理刪除考卷
+export async function handleDeleteQuiz(quizId) {
+    if (!quizId) return;
+    if (confirm("您確定要以管理員身分刪除這份題庫嗎？此操作無法復原！")) {
+        ui.showLoader("正在刪除題庫...");
+        try {
+            await deleteQuiz(quizId); 
+            ui.showToast("刪除成功！", "success");
+            await refreshLibrary(); // 重新整理列表
+        } catch (error) {
+            console.error("刪除失敗:", error);
+            ui.showToast(error.message || "刪除失敗，請稍後再試。", "error");
+        } finally {
+            ui.hideLoader();
+        }
+    }
+}
 
 // --- 草稿功能 ---
 const DRAFT_INPUTS_KEY = 'questwiz_draft_inputs_v1';
@@ -1013,7 +1181,7 @@ export async function exportFile() {
                     break;
                 case 'gimkit':
                     // Gimkit CSV Format
-                    // Header 1: Gimkit Spreadsheet Import Template,,,,
+                    // Header 1: Gimkit Spreadsheet Import Template,,,, 
                     // Header 2: Question,Correct Answer,Incorrect Answer 1,Incorrect Answer 2 (Optional),Incorrect Answer 3 (Optional)
                     let csvContentGimkit = 'Gimkit Spreadsheet Import Template,,,,';
                     csvContentGimkit += '\nQuestion,Correct Answer,Incorrect Answer 1,Incorrect Answer 2 (Optional),Incorrect Answer 3 (Optional)';
@@ -1037,7 +1205,7 @@ export async function exportFile() {
                         }
 
                         // Ensure we have at least 3 incorrect slots for the CSV columns (though optional, good to fill if exist)
-                        // The loop will just iterate what we have.
+                        // The loop will just iterate what we have. 
                         
                         const escapeCsv = (str) => {
                             if (typeof str !== 'string') return '';

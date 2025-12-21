@@ -3,8 +3,290 @@ import * as state from './state.js';
 import { triggerQuestionGeneration } from './handlers.js';
 import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js'; // 引入 DOM 模組
+import { TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js'; // 引入常數
 
 import { translations } from './translations.js';
+
+// --- 初始化與下拉選單 ---
+
+/**
+ * 填充所有下拉選單 (領域、議題、年級、出版社)
+ * 包含上傳視窗與題庫大廳的篩選器
+ */
+export function populateDropdowns() {
+    const gradeOptions = [
+        { value: "全部", text: "所有年級" },
+        ...Array.from({ length: 12 }, (_, i) => ({ value: i + 1, text: `${i + 1} 年級` }))
+    ];
+
+    const populate = (selectElement, options, defaultOption) => {
+        if (!selectElement) return;
+        selectElement.innerHTML = '';
+        if (defaultOption) {
+            const opt = document.createElement('option');
+            opt.value = defaultOption.value;
+            opt.textContent = defaultOption.text;
+            selectElement.appendChild(opt);
+        }
+        options.forEach(item => {
+            const opt = document.createElement('option');
+            const isObj = typeof item === 'object';
+            opt.value = isObj ? item.value : item;
+            opt.textContent = isObj ? item.text : item;
+            selectElement.appendChild(opt);
+        });
+    };
+
+    // 1. 領域 (Domains)
+    populate(elements.uploadDomain, TAIWAN_EDU_DOMAINS, { value: "", text: "請選擇領域..." });
+    populate(elements.libDomainSelect, TAIWAN_EDU_DOMAINS, { value: "全部", text: "所有領域" });
+
+    // 2. 議題 (Issues)
+    populate(elements.uploadIssue, TAIWAN_EDU_ISSUES); // uploadIssue 的第一個選項 "無" 已在常數中
+    populate(elements.libIssueSelect, TAIWAN_EDU_ISSUES.filter(i => i !== '無'), { value: "全部", text: "所有議題" });
+
+    // 3. 年級 (Grades)
+    // 上傳用的年級選單 (不含"全部")
+    populate(elements.uploadGrade, gradeOptions.slice(1), { value: "", text: "請選擇年級..." });
+    // 篩選用的年級選單
+    populate(elements.libGradeSelect, gradeOptions.slice(1), { value: "全部", text: "所有年級" });
+
+    // 4. 出版社 (Publishers)
+    populate(elements.uploadPublisher, TAIWAN_PUBLISHERS, { value: "", text: "請選擇出版社..." });
+    populate(elements.libPublisherSelect, TAIWAN_PUBLISHERS, { value: "全部", text: "所有出版社" });
+}
+
+// --- 視窗控制 ---
+
+export function toggleUploadModal(show) {
+    if (!elements.uploadModal) return;
+    if (show) {
+        elements.uploadModal.classList.remove('hidden');
+        // 自動填入標題 (如果有)
+        if (elements.uploadUnit && elements.quizTitleInput) {
+             if (!elements.uploadUnit.value) {
+                 elements.uploadUnit.value = elements.quizTitleInput.value;
+             }
+        }
+    } else {
+        elements.uploadModal.classList.add('hidden');
+    }
+}
+
+/**
+ * 切換右側工作區 Tab
+ * @param {string} tabId - 'edit' 或 'library'
+ */
+export function switchWorkTab(tabId) {
+    if (!elements.workTabs) return;
+    
+    const isLibrary = tabId === 'library';
+    const targetIndex = isLibrary ? 1 : 0;
+
+    elements.workTabs.buttons.forEach((btn, idx) => {
+        if (idx === targetIndex) {
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+        } else {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-selected', 'false');
+        }
+    });
+
+    elements.workTabs.contents.forEach((content, idx) => {
+        if (idx === targetIndex) {
+            content.classList.remove('hidden');
+            content.classList.add('active');
+        } else {
+            content.classList.add('hidden');
+            content.classList.remove('active');
+        }
+    });
+}
+
+// --- 題庫列表渲染 ---
+
+/**
+ * 顯示題庫載入中動畫
+ */
+export function showLibraryLoader() {
+    if (elements.libQuizList) {
+        // 重置容器樣式為置中顯示
+        elements.libQuizList.className = "h-64 flex flex-col items-center justify-center text-gray-500 border rounded-lg bg-gray-50";
+        elements.libQuizList.innerHTML = `
+            <svg class="animate-spin h-8 w-8 mb-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>正在從雲端載入題庫...</p>`;
+    }
+}
+
+/**
+ * 渲染題庫列表 (表格版)
+ * @param {Array} quizzes - 測驗卷物件陣列
+ * @param {Function} onImport - 點擊匯入時的回呼函式 (quizData) => void
+ * @param {Function} onDelete - [新增] 點擊刪除時的回呼函式 (quizId) => void
+ */
+export function renderLibraryQuizzes(quizzes, onImport, onDelete) {
+    if (!elements.libQuizList) return;
+    
+    // 設定容器樣式：固定高度 + 垂直卷軸 + 表格框線
+    // max-h-[600px] 大約可顯示 10-12 筆資料
+    elements.libQuizList.className = "max-h-[600px] overflow-y-auto overflow-x-auto border border-gray-200 rounded-lg custom-scrollbar bg-white shadow-sm";
+
+    if (quizzes.length === 0) {
+        elements.libQuizList.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-16 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="text-lg font-medium">沒有找到符合條件的測驗卷</p>
+                <p class="text-sm">試著調整篩選條件看看？</p>
+            </div>`;
+        return;
+    }
+
+    // 產生表格列 HTML
+    const rowsHtml = quizzes.map((quiz, index) => {
+        const date = quiz.createdAt ? new Date(quiz.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '-';
+        const qCount = quiz.questions ? quiz.questions.length : 0;
+        const domainColor = getDomainColor(quiz.domain);
+        
+        // 議題標籤
+        const issueBadge = (quiz.issue && quiz.issue !== '無') 
+            ? `<div class="mt-1"><span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">#${quiz.issue}</span></div>` 
+            : '';
+
+        // [新增] 只有在管理員模式下才顯示刪除按鈕
+        const deleteButtonHtml = state.isAdminMode() 
+            ? `
+            <button class="delete-quiz-btn ml-2 inline-flex items-center justify-center p-2 border border-transparent text-sm font-medium rounded-full text-gray-400 hover:text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all" data-id="${quiz.id}" title="刪除此題庫">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.995L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+            ` 
+            : '';
+
+        return `
+            <tr class="group hover:bg-indigo-50/50 transition-colors border-b last:border-b-0 border-gray-100">
+                <!-- 單元名稱 (主要資訊) -->
+                <td class="px-4 py-3 align-middle">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-gray-800 text-sm md:text-base line-clamp-1" title="${quiz.unit || quiz.title}">
+                            ${quiz.unit || quiz.title}
+                        </span>
+                        <!-- 手機版顯示額外資訊 -->
+                        <div class="md:hidden text-xs text-gray-500 mt-1 flex flex-wrap gap-1 items-center">
+                            <span class="${domainColor.text}">${quiz.domain}</span>
+                            <span>•</span>
+                            <span>${quiz.grade}年級</span>
+                            <span>•</span>
+                            <span>${quiz.author}</span>
+                        </div>
+                    </div>
+                </td>
+
+                <!-- 領域 (桌機版) -->
+                <td class="px-4 py-3 align-middle hidden md:table-cell">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${domainColor.bg} ${domainColor.text}">
+                        ${quiz.domain || '未分類'}
+                    </span>
+                    ${issueBadge}
+                </td>
+
+                <!-- 年級 (桌機版) -->
+                <td class="px-4 py-3 align-middle text-sm text-gray-600 text-center hidden md:table-cell whitespace-nowrap">
+                    ${quiz.grade} 年級
+                </td>
+
+                <!-- 作者 (桌機版) -->
+                <td class="px-4 py-3 align-middle text-sm text-gray-600 hidden md:table-cell">
+                    <div class="flex items-center max-w-[120px]" title="${quiz.author}">
+                        <svg class="w-3.5 h-3.5 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span class="truncate">${quiz.author || '匿名'}</span>
+                    </div>
+                </td>
+
+                <!-- 資訊/日期 (桌機版) -->
+                <td class="px-4 py-3 align-middle text-xs text-gray-500 whitespace-nowrap hidden sm:table-cell text-right">
+                    <div>${date}</div>
+                    <div class="text-gray-400 mt-0.5" title="下載次數">
+                        <span class="inline-flex items-center"><svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>${quiz.downloadCount || 0}</span>
+                        <span class="mx-1">|</span>
+                        <span>${qCount}題</span>
+                    </div>
+                </td>
+
+                <!-- 操作按鈕 -->
+                <td class="px-4 py-3 align-middle text-right whitespace-nowrap">
+                    <div class="flex items-center justify-end">
+                        <button class="import-quiz-btn inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-all active:scale-95" data-index="${index}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 md:mr-0 lg:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span class="inline md:hidden lg:inline">匯入</span>
+                        </button>
+                        ${deleteButtonHtml}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // 組合完整表格
+    elements.libQuizList.innerHTML = `
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm ring-1 ring-gray-200/50">
+                <tr>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-full md:w-auto">單元名稱</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell w-32">領域</th>
+                    <th scope="col" class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell w-20">年級</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell w-32">作者</th>
+                    <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell w-28">資訊</th>
+                    <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-20 md:w-24">操作</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-100">
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
+
+    // 重新綁定事件
+    const importBtns = elements.libQuizList.querySelectorAll('.import-quiz-btn');
+    importBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = btn.dataset.index;
+            onImport(quizzes[index]);
+        });
+    });
+
+    if (state.isAdminMode()) {
+        const deleteBtns = elements.libQuizList.querySelectorAll('.delete-quiz-btn');
+        deleteBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const quizId = e.currentTarget.dataset.id;
+                onDelete(quizId);
+            });
+        });
+    }
+}
+
+function getDomainColor(domain) {
+    const colors = {
+        '語文': { bg: 'bg-red-100', text: 'text-red-800' },
+        '數學': { bg: 'bg-blue-100', text: 'text-blue-800' },
+        '社會': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+        '自然科學': { bg: 'bg-green-100', text: 'text-green-800' },
+        '藝術': { bg: 'bg-purple-100', text: 'text-purple-800' },
+        '綜合活動': { bg: 'bg-orange-100', text: 'text-orange-800' },
+        '科技': { bg: 'bg-cyan-100', text: 'text-cyan-800' },
+        '健康與體育': { bg: 'bg-teal-100', text: 'text-teal-800' }
+    };
+    return colors[domain] || { bg: 'bg-gray-100', text: 'text-gray-800' };
+}
 
 /**
  * 顯示提示訊息 (Toast)
@@ -263,13 +545,24 @@ export function populateVersionHistory() {
     const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
 
-    const currentDisplayVersion = 'v8.6 版本修正歷程';
+    const currentDisplayVersion = 'v8.7 版本修正歷程';
     if (elements.versionBtn) elements.versionBtn.textContent = currentDisplayVersion;
 
     const versionHistory = [
         {
-            version: "v8.6 (2025/12/14)",
+            version: "v8.7 (2025/12/20)",
             current: true,
+            notes: [
+                "【✨ 新增題庫大廳】",
+                " - **題庫大廳**：新增「題庫大廳」至右側工作區，以分頁顯示，提供寬敞的瀏覽體驗。",
+                " - **新增題庫上傳**：依個人意願上傳題庫上傳，提供教師社群功能。",
+                " - **Remix 功能**：匯入題庫時，會自動還原當時的生成設定與來源內文。",
+                " - **管理員模式**：新增管理員模式，提供管理者刪除題庫。",
+            ]
+        },
+        {
+            version: "v8.6 (2025/12/14)",
+            current: false,
             notes: [
                 "【🌍 國際化支援】",
                 " - 新增「語言」設定分頁，支援 **繁體中文** 與 **English** 介面切換。",
@@ -524,4 +817,46 @@ export function initLanguage() {
 export function t(key) {
     const lang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
     return (translations[lang] && translations[lang][key]) ? translations[lang][key] : key;
+}
+
+/**
+ * [新增] 匯入題庫時，將儲存的設定與內容套用回介面
+ * @param {object} quiz - 從 Firestore 讀取的完整測驗物件
+ */
+export function applyImportedData(quiz) {
+    const { settings, sourceContext, title, unit } = quiz;
+
+    // 1. 恢復生成設定
+    if (settings) {
+        if (elements.formatSelect) elements.formatSelect.value = settings.format || '';
+        if (elements.studentLevelSelect) elements.studentLevelSelect.value = settings.studentLevel || '';
+        if (elements.difficultySelect) elements.difficultySelect.value = settings.difficulty || '中等';
+        if (elements.questionTypeSelect) elements.questionTypeSelect.value = settings.questionType || 'multiple_choice';
+        if (elements.questionStyleSelect) elements.questionStyleSelect.value = settings.questionStyle || 'knowledge-recall';
+        if (elements.numQuestionsInput) elements.numQuestionsInput.value = settings.numQuestions || '5';
+    }
+
+    // 2. 恢復來源內容與對應的 Tab
+    if (sourceContext && sourceContext.content) {
+        // 清空所有輸入
+        elements.textInput.value = '';
+        elements.urlInput.value = '';
+        // 根據類型填入並切換 Tab
+        if (sourceContext.sourceType === 'url') {
+            elements.urlInput.value = sourceContext.content;
+            if (elements.tabs.input.buttons[2]) { // URL tab is at index 2
+                elements.tabs.input.buttons[2].click();
+            }
+        } else { // 'text' or 'image' (image content is just a placeholder text)
+            elements.textInput.value = sourceContext.content;
+            if (elements.tabs.input.buttons[0]) { // Text tab is at index 0
+                elements.tabs.input.buttons[0].click();
+            }
+        }
+    }
+    
+    // 3. 恢復標題
+    if (elements.quizTitleInput) {
+        elements.quizTitleInput.value = unit || title;
+    }
 }

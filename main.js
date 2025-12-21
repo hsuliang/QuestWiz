@@ -8,8 +8,16 @@ import { elements, getControls } from './dom.js'; // 引入 DOM 模組
 
 // --- 事件監聽器與初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
+    // [新增] 檢查並啟用管理員模式
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === 'true') {
+        state.setAdminMode(true);
+        console.log('%c[Admin Mode Enabled]', 'color: #ff4500; font-weight: bold;');
+    }
+
     // 初始化 UI
     ui.populateVersionHistory();
+    ui.populateDropdowns(); // 初始化下拉選單
     ui.applyLayoutPreference();
     ui.applyThemePreference();
     ui.initLanguage(); // 初始化語言
@@ -74,6 +82,39 @@ document.addEventListener('DOMContentLoaded', () => {
     ui.setupDragDrop(elements.textInput, (file) => handlers.handleFile(file), false);
     ui.setupDragDrop(elements.imageDropZone, handlers.handleImageFiles, true);
     
+    // --- 題庫大廳與上傳相關事件 ---
+    
+    // 開啟上傳視窗
+    utils.addSafeEventListener(elements.uploadCommunityBtn, 'click', handlers.handleUploadModalOpen, 'uploadCommunityBtn');
+    
+    // 關閉上傳視窗
+    utils.addSafeEventListener(elements.closeUploadModalBtn, 'click', () => ui.toggleUploadModal(false), 'closeUploadModalBtn');
+    utils.addSafeEventListener(elements.uploadModal, 'click', (e) => {
+        if (e.target === elements.uploadModal) ui.toggleUploadModal(false);
+    }, 'uploadModalBackground');
+
+    // 送出上傳表單
+    utils.addSafeEventListener(elements.uploadForm, 'submit', handlers.handleUploadSubmit, 'uploadForm');
+
+    // 點擊「題庫大廳」分頁 (右側工作區 Tab)
+    if (elements.workTabs && elements.workTabs.buttons) {
+        elements.workTabs.buttons.forEach((btn, index) => {
+            const tabId = index === 0 ? 'edit' : 'library';
+            utils.addSafeEventListener(btn, 'click', () => handlers.handleWorkTabClick(tabId), `workTab-${tabId}`);
+        });
+    }
+
+    // 題庫篩選器變更
+    const filterSelects = [
+        elements.libDomainSelect, 
+        elements.libGradeSelect, 
+        elements.libIssueSelect, 
+        elements.libPublisherSelect
+    ];
+    filterSelects.forEach(select => {
+        utils.addSafeEventListener(select, 'change', handlers.handleLibraryFilterChange, `lib-filter-${select.id}`);
+    });
+
     // API 金鑰操作步驟 Toggle
     if (elements.toggleApiStepsBtn && elements.apiStepsContainer && elements.apiStepsArrow) {
         utils.addSafeEventListener(elements.toggleApiStepsBtn, 'click', () => {

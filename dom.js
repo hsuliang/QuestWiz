@@ -89,17 +89,50 @@ export const elements = {
         }
     },
 
-    // Modals
+    // Workplace Tabs (Right Column)
+    workTabs: {
+        buttons: [
+            document.getElementById('work-tab-edit'),
+            document.getElementById('work-tab-library')
+        ],
+        contents: [
+            document.getElementById('work-content-edit'),
+            document.getElementById('work-content-library')
+        ]
+    },
+
+    // Upload Modal
+    uploadModal: document.getElementById('upload-modal'),
+    closeUploadModalBtn: document.getElementById('close-upload-modal-btn'),
+    uploadForm: document.getElementById('upload-form'),
+    uploadAuthor: document.getElementById('upload-author'),
+    uploadDomain: document.getElementById('upload-domain'),
+    uploadGrade: document.getElementById('upload-grade'),
+    uploadIssue: document.getElementById('upload-issue'),
+    uploadPublisher: document.getElementById('upload-publisher'),
+    uploadUnit: document.getElementById('upload-unit'),
+
+    // Community Library
+    uploadCommunityBtn: document.getElementById('upload-community-btn'),
+    libDomainSelect: document.getElementById('lib-domain-select'),
+    libGradeSelect: document.getElementById('lib-grade-select'),
+    libIssueSelect: document.getElementById('lib-issue-select'),
+    libPublisherSelect: document.getElementById('lib-publisher-select'),
+    libQuizList: document.getElementById('lib-quiz-list'),
+
+    // Modals (Version, Post-Download, Prompt, Share)
     versionModal: document.getElementById('version-modal'),
     closeModalBtn: document.getElementById('close-modal-btn'),
+    
     postDownloadModal: document.getElementById('post-download-modal'),
     continueEditingBtn: document.getElementById('continue-editing-btn'),
     clearAndNewBtn: document.getElementById('clear-and-new-btn'),
+
     promptModal: document.getElementById('prompt-modal'),
     closePromptModalBtn: document.getElementById('close-prompt-modal-btn'),
-    promptDisplayArea: document.getElementById('prompt-display-area'),
     copyPromptBtn: document.getElementById('copy-prompt-btn'),
     generateWithEditedPromptBtn: document.getElementById('generate-with-edited-prompt-btn'),
+    
     shareModal: document.getElementById('share-modal'),
     closeShareModalBtn: document.getElementById('close-share-modal-btn'),
     copyLinkBtn: document.getElementById('copy-link-btn'),
