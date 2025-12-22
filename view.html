@@ -48,7 +48,7 @@
         async function loadContent() {
             if (contentId) {
                 try {
-                    const docRef = doc(db, "shared_content", contentId);
+                    const docRef = doc(db, "shared_contents", contentId);
                     const docSnap = await getDoc(docRef);
 
                     if (docSnap.exists()) {

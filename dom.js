@@ -1,174 +1,125 @@
-// --- DOM 元素集中管理 ---
-// 將所有 document.getElementById 和其他選擇器集中於此，方便維護
-
+/**
+ * 中央管理所有 DOM 元素引用，避免在各處重複查詢
+ */
 export const elements = {
-    // 主容器
+    // 常用設定 (Settings)
+    apiKeyInput: document.getElementById('api-key-input'),
+    saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+    clearApiKeyBtn: document.getElementById('clear-api-key-btn'),
+    toggleApiKeyVisibilityBtn: document.getElementById('toggle-api-key-visibility'),
+    collapseSettingsBtn: document.getElementById('collapse-settings-btn'),
+    commonSettingsCard: document.getElementById('common-settings-card'),
+    toggleApiStepsBtn: document.getElementById('toggle-api-steps-btn'),
+    apiStepsContainer: document.getElementById('api-steps-container'),
+    apiStepsArrow: document.getElementById('api-steps-arrow'),
+    layoutToggleBtn: document.getElementById('layout-toggle-btn'),
+    themeRadios: document.querySelectorAll('input[name="theme"]'),
     mainContainer: document.getElementById('main-container'),
-    
-    // 輸入區
+
+    // 提供內容 (Content Input)
     textInput: document.getElementById('text-input'),
     fileInput: document.getElementById('file-input'),
-    fileErrorDisplay: document.getElementById('file-error-display'),
     fileNameDisplay: document.getElementById('file-name-display'),
+    fileErrorDisplay: document.getElementById('file-error-display'),
     imageInput: document.getElementById('image-input'),
     imageDropZone: document.getElementById('image-drop-zone'),
     imagePreviewContainer: document.getElementById('image-preview-container'),
     imageErrorDisplay: document.getElementById('image-error-display'),
     urlInput: document.getElementById('url-input'),
     urlTypeWebRadio: document.getElementById('url-type-web'),
-    
-    // 設定區
-    numQuestionsInput: document.getElementById('num-questions'),
-    quizTitleInput: document.getElementById('quiz-title-input'), // 新增
-    formatSelect: document.getElementById('format-select'),
-    questionTypeSelect: document.getElementById('question-type-select'),
-    difficultySelect: document.getElementById('difficulty-select'),
-    questionStyleSelect: document.getElementById('question-style-select'),
-    studentLevelSelect: document.getElementById('student-level-select'),
-    studentLevelSelectQuiz: document.getElementById('student-level-select-quiz'), // 新增
-    
-    // API Key 相關
-    apiKeyInput: document.getElementById('api-key-input'),
-    saveApiKeyBtn: document.getElementById('save-api-key-btn'),
-    clearApiKeyBtn: document.getElementById('clear-api-key-btn'),
-    apiStepsContainer: document.getElementById('api-steps-container'),
-    toggleApiStepsBtn: document.getElementById('toggle-api-steps-btn'),
-    apiStepsArrow: document.getElementById('api-steps-arrow'),
-    toggleApiKeyVisibilityBtn: document.getElementById('toggle-api-key-visibility'),
-
-    // 按鈕
-    versionBtn: document.getElementById('version-btn'),
     downloadTxtBtn: document.getElementById('download-txt-btn'),
     shareContentBtn: document.getElementById('share-content-btn'),
     clearContentBtn: document.getElementById('clear-content-btn'),
-    generateContentBtn: document.getElementById('generate-content-btn'),
-    extractFromUrlBtn: document.getElementById('extract-from-url-btn'),
-    generateFromImagesBtn: document.getElementById('generate-from-images-btn'),
-    downloadBtn: document.getElementById('download-btn'),
-    resetBtn: document.getElementById('reset-btn'),
-    regenerateBtn: document.getElementById('regenerate-btn'),
-    layoutToggleBtn: document.getElementById('layout-toggle-btn'),
-    collapseSettingsBtn: document.getElementById('collapse-settings-btn'),
-    
-    // FAB
-    mobileFab: document.getElementById('mobile-fab'),
-    fabIconDown: document.getElementById('fab-icon-down'),
-    fabIconUp: document.getElementById('fab-icon-up'),
-
-    // 分頁 (Tabs)
-    tabs: {
-        settings: {
-            buttons: [
-                document.getElementById('settings-tab-api'),
-                document.getElementById('settings-tab-level'),
-                document.getElementById('settings-tab-theme'),
-                document.getElementById('settings-tab-layout'),
-                document.getElementById('settings-tab-language')
-            ],
-            contents: [
-                document.getElementById('settings-content-api'),
-                document.getElementById('settings-content-level'),
-                document.getElementById('settings-content-theme'),
-                document.getElementById('settings-content-layout'),
-                document.getElementById('settings-content-language')
-            ]
-        },
-        input: {
-            buttons: [
-                document.getElementById('tab-text'),
-                document.getElementById('tab-image'),
-                document.getElementById('tab-url'),
-                document.getElementById('tab-ai')
-            ],
-            contents: [
-                document.getElementById('content-text'),
-                document.getElementById('content-image'),
-                document.getElementById('content-url'),
-                document.getElementById('content-ai')
-            ]
-        }
-    },
-
-    // Workplace Tabs (Right Column)
-    workTabs: {
-        buttons: [
-            document.getElementById('work-tab-edit'),
-            document.getElementById('work-tab-library')
-        ],
-        contents: [
-            document.getElementById('work-content-edit'),
-            document.getElementById('work-content-library')
-        ]
-    },
-
-    // Upload Modal
-    uploadModal: document.getElementById('upload-modal'),
-    closeUploadModalBtn: document.getElementById('close-upload-modal-btn'),
-    uploadForm: document.getElementById('upload-form'),
-    uploadAuthor: document.getElementById('upload-author'),
-    uploadDomain: document.getElementById('upload-domain'),
-    uploadGrade: document.getElementById('upload-grade'),
-    uploadIssue: document.getElementById('upload-issue'),
-    uploadPublisher: document.getElementById('upload-publisher'),
-    uploadUnit: document.getElementById('upload-unit'),
-
-    // Community Library
-    uploadCommunityBtn: document.getElementById('upload-community-btn'),
-    libDomainSelect: document.getElementById('lib-domain-select'),
-    libGradeSelect: document.getElementById('lib-grade-select'),
-    libIssueSelect: document.getElementById('lib-issue-select'),
-    libPublisherSelect: document.getElementById('lib-publisher-select'),
-    libQuizList: document.getElementById('lib-quiz-list'),
-
-    // Modals (Version, Post-Download, Prompt, Share)
-    versionModal: document.getElementById('version-modal'),
-    closeModalBtn: document.getElementById('close-modal-btn'),
-    
-    postDownloadModal: document.getElementById('post-download-modal'),
-    continueEditingBtn: document.getElementById('continue-editing-btn'),
-    clearAndNewBtn: document.getElementById('clear-and-new-btn'),
-
-    promptModal: document.getElementById('prompt-modal'),
-    closePromptModalBtn: document.getElementById('close-prompt-modal-btn'),
-    copyPromptBtn: document.getElementById('copy-prompt-btn'),
-    generateWithEditedPromptBtn: document.getElementById('generate-with-edited-prompt-btn'),
-    
-    shareModal: document.getElementById('share-modal'),
-    closeShareModalBtn: document.getElementById('close-share-modal-btn'),
-    copyLinkBtn: document.getElementById('copy-link-btn'),
-
-    // AI 生成內容相關
     topicInput: document.getElementById('topic-input'),
     textTypeSelect: document.getElementById('text-type-select'),
     customTextTypeInput: document.getElementById('custom-text-type-input'),
     learningObjectivesInput: document.getElementById('learning-objectives-input'),
     toneSelect: document.getElementById('tone-select'),
     customToneInput: document.getElementById('custom-tone-input'),
-    competencyBasedCheckbox: document.getElementById('competency-based-checkbox'),
+    outputLangSelect: document.getElementById('output-lang-select'),
+    generateContentBtn: document.getElementById('generate-content-btn'),
+    extractFromUrlBtn: document.getElementById('extract-from-url-btn'),
     editPromptBtn: document.getElementById('edit-prompt-btn'),
-    studentLevelSelectContent: document.getElementById('student-level-select-content'), // 新增
 
-    // 其他
-    commonSettingsCard: document.getElementById('common-settings-card'),
-    themeRadios: document.querySelectorAll('input[name="theme"]'),
-    previewPlaceholder: document.querySelector('#preview-placeholder p'),
-    previewActions: document.getElementById('preview-actions'),
+    // 題目生成設定 (Quiz Settings)
+    quizTitleInput: document.getElementById('quiz-title-input'),
+    studentLevelSelect: document.getElementById('student-level-select-quiz'),
+    studentLevelSelects: document.querySelectorAll('.student-level-sync'), // 全域同步
+    numQuestionsInput: document.getElementById('num-questions'),
+    formatSelect: document.getElementById('format-select'),
+    questionTypeSelect: document.getElementById('question-type-select'),
+    difficultySelect: document.getElementById('difficulty-select'),
+    questionStyleSelect: document.getElementById('question-style-select'),
+    competencyBasedCheckbox: document.getElementById('competency-based-checkbox'),
+    
+    // 布魯姆認知層次 (Bloom Taxonomy)
+    toggleBloomBtn: document.getElementById('toggle-bloom-btn'),
+    bloomOptionsContainer: document.getElementById('bloom-options-container'),
+    bloomArrow: document.getElementById('bloom-arrow'),
+    bloomLevelCheckboxes: document.querySelectorAll('.bloom-checkbox'),
+
+    // 預覽與編輯 (Preview Area)
+    previewColumn: document.getElementById('preview-column'),
+    controlsColumn: document.getElementById('controls-column'),
+    previewLoader: document.getElementById('preview-loader'),
+    loadingText: document.getElementById('loading-text'),
+    previewPlaceholder: document.getElementById('preview-placeholder'),
     questionsContainer: document.getElementById('questions-container'),
-    studentLevelSelects: [ // 新增：方便同步的陣列
-        document.getElementById('student-level-select'),
-        document.getElementById('student-level-select-content'),
-        document.getElementById('student-level-select-quiz')
-    ]
-};
+    previewActions: document.getElementById('preview-actions'),
+    regenerateBtn: document.getElementById('regenerate-btn'),
+    downloadBtn: document.getElementById('download-btn'),
+    resetBtn: document.getElementById('reset-btn'),
+    mobileFab: document.getElementById('mobile-fab'),
 
-// 為了向後相容舊代碼，暫時保留一些 getter
-export function getControls() {
-    return [
-        elements.textInput,
-        elements.numQuestionsInput,
-        elements.questionTypeSelect,
-        elements.difficultySelect,
-        elements.questionStyleSelect,
-        elements.studentLevelSelect
-    ];
-}
+    // 題庫大廳 (Community Library)
+    libQuizList: document.getElementById('lib-quiz-list'),
+    libDomainSelect: document.getElementById('lib-domain-select'),
+    libGradeSelect: document.getElementById('lib-grade-select'),
+    libPublisherSelect: document.getElementById('lib-publisher-select'),
+    libIssueSelect: document.getElementById('lib-issue-select'),
+    uploadCommunityBtn: document.getElementById('upload-community-btn'),
+
+    // 彈出視窗 (Modals)
+    versionBtn: document.getElementById('version-btn'),
+    versionModal: document.getElementById('version-modal'),
+    closeModalBtn: document.getElementById('close-modal-btn'),
+    uploadModal: document.getElementById('upload-modal'),
+    uploadForm: document.getElementById('upload-form'),
+    uploadUnit: document.getElementById('upload-unit'),
+    uploadAuthor: document.getElementById('upload-author'),
+    uploadGrade: document.getElementById('upload-grade'),
+    uploadDomain: document.getElementById('upload-domain'),
+    uploadPublisher: document.getElementById('upload-publisher'),
+    uploadIssue: document.getElementById('upload-issue'),
+    closeUploadModalBtn: document.getElementById('close-upload-modal-btn'),
+    postDownloadModal: document.getElementById('post-download-modal'),
+    postDownloadModalContent: document.getElementById('post-download-modal-content'),
+    continueEditingBtn: document.getElementById('continue-editing-btn'),
+    clearAndNewBtn: document.getElementById('clear-and-new-btn'),
+    promptModal: document.getElementById('prompt-modal'),
+    promptDisplayArea: document.getElementById('prompt-display-area'),
+    closePromptModalBtn: document.getElementById('close-prompt-modal-btn'),
+    copyPromptBtn: document.getElementById('copy-prompt-btn'),
+    generateWithEditedPromptBtn: document.getElementById('generate-with-edited-prompt-btn'),
+    shareModal: document.getElementById('share-modal'),
+    closeShareModalBtn: document.getElementById('close-share-modal-btn'),
+    qrCodeContainer: document.getElementById('qr-code-container'),
+    shareLinkInput: document.getElementById('share-link-input'),
+    copyLinkBtn: document.getElementById('copy-link-btn'),
+
+    // Tabs 系統
+    tabs: {
+        settings: {
+            buttons: document.querySelectorAll('.settings-tab-btn'),
+            contents: document.querySelectorAll('.settings-tab-content')
+        },
+        input: {
+            buttons: document.querySelectorAll('.tab-btn'),
+            contents: document.querySelectorAll('.tab-content')
+        }
+    },
+    workTabs: {
+        buttons: document.querySelectorAll('.work-tab-btn'),
+        contents: document.querySelectorAll('.work-tab-content')
+    }
+};

@@ -1,259 +1,94 @@
 /**
- * AI 提示詞管理模組
- * 包含所有 System Instructions 和 User Prompts 的生成邏輯
+ * 取得學習內容生成的 System Instruction
  */
+export function getContentSystemInstruction({ topic, textType, tone, studentGradeText, wordCount, learningObjectives, interfaceLanguage, isTargetEnglish, languageInstruction }) {
+    return `
+你是一位專業的教育內容創作者，請根據以下資訊撰寫一篇適合學生的學習內容（內文）。
 
-/**
- * 生成內容的 System Instruction
- * @param {Object} params - 參數物件
- * @param {string} params.topic - 主題
- * @param {string} params.textType - 文本類型
- * @param {string} params.tone - 語氣
- * @param {string} params.studentGradeText - 學生年級文字
- * @param {number} params.wordCount - 字數
- * @param {string} params.learningObjectives - 學習目標
- * @param {string} params.interfaceLanguage - 介面語言 ('zh-TW' or 'en')
- * @param {boolean} params.isTargetEnglish - 是否強制目標內容為英文
- * @returns {string} - 完整的 Prompt
- */
-export function getContentSystemInstruction({ topic, textType, tone, studentGradeText, wordCount, learningObjectives, interfaceLanguage = 'zh-TW', isTargetEnglish = false }) {
-    const isEnInterface = interfaceLanguage === 'en';
-    
-    // 決定最終輸出的語言指令
-    // 如果偵測到主題是英文 (isTargetEnglish 為 true)，則強制要求輸出英文
-    // 否則，如果介面是英文，預設輸出英文；介面是中文，預設輸出中文
-    let outputLangInstruction = "";
-    if (isTargetEnglish) {
-        outputLangInstruction = isEnInterface 
-            ? "5. Language: Please write the entire article in English." 
-            : "5. 語言要求：請全程使用英文撰寫這篇文章。";
-    } else {
-        // 若沒有強制英文，則預設跟隨介面語言 (或不做額外限制，讓 AI 自由發揮，但通常建議明確指定)
-        outputLangInstruction = isEnInterface
-            ? "5. Language: Please write the entire article in English."
-            : "5. 語言要求：請全程使用繁體中文 (Traditional Chinese, Taiwan) 撰寫。";
-    }
-
-    if (isEnInterface) {
-        const topicSection = learningObjectives.trim()
-            ? `The core topic is "${topic}", and it must clearly revolve around the following learning objectives or keywords:\n${learningObjectives}`
-            : `The core topic is "${topic}".`;
-
-        return `
-P (Persona):
-You are a top-tier "${textType}" design expert and author specializing in writing educational materials for "${studentGradeText}" students.
-
-A (Act):
-Your task is to create a high-quality educational article of approximately ${wordCount} words based on the requirements below.
-
-R (Recipient):
-The target audience is "${studentGradeText}" students. Ensure the depth and vocabulary are appropriate for their cognitive level.
-
-T (Topic):
-${topicSection}
-
-S (Structure):
-Please strictly adhere to the following format and style requirements:
-1. Genre: Must be "${textType}".
-2. Tone: Must be "${tone}".
-3. Structure: Provide an engaging title and divide the content into several paragraphs for readability.
-4. Output: Provide the complete article content directly, without any additional explanations or opening remarks.
-${outputLangInstruction}
-        `;
-    } else {
-        const topicSection = learningObjectives.trim()
-            ? `文章的核心主題是「${topic}」，並且必須清晰地圍繞以下核心學習目標或關鍵詞彙來撰寫：\n${learningObjectives}`
-            : `文章的核心主題是「${topic}」。`;
-
-        return `
-P (Persona):
-你是一位專為「${studentGradeText}」學生編寫教材的頂尖「${textType}」設計專家與作者。
-
-A (Act):
-你的任務是根據下方的要求，創作一篇長度約為 ${wordCount} 字的高品質教學文章。
-
-R (Recipient):
-這篇文章的目標讀者是「${studentGradeText}」的學生，請確保內容的深度與用詞符合他們的認知水平。
-
-T (Topic):
-${topicSection}
-
-S (Structure):
-請嚴格遵守以下格式與風格要求：
-1. 文章體裁：必須是「${textType}」。
-2. 寫作語氣：必須是「${tone}」。
-3. 文章結構：請為文章加上一個吸引人的標題，並將內容分成數個段落以便閱讀。
-4. 最終產出：直接提供完整的文章內容，不要包含任何額外的說明或開場白。
-${outputLangInstruction}
-        `;
-    }
+【重要指示】
+1. 語言規範：${languageInstruction}
+2. 標題要求：請在回應的最開頭，先提供一個精確反映核心內容的「試卷標題」，格式為「TITLE: [標題內容]」。
+   - 標題規範：字數控制在 10 個中文字以內。
+   - 核心要求：標題必須語意完整且具代表性，禁止在結尾處切斷句子。
+3. 內容設定：
+---
+主題：${topic}
+---
+目標學生：${studentGradeText}
+內文字數：約 ${wordCount} 字左右
+文章類型：${textType}
+寫作語氣：${tone}
+學習目標/關鍵字：${learningObjectives || '由你根據主題專業判斷'}
+`;
 }
 
 /**
- * 生成題目的 System Instruction
- * @param {string} questionStyle - 出題風格 ('knowledge-recall' 或 'competency-based')
- * @param {string} studentLevel - 學生程度
- * @param {string} interfaceLanguage - 介面語言 ('zh-TW' or 'en')
- * @returns {string} - System Instruction
+ * 取得題目生成的 System Instruction
  */
-export function getQuestionSystemInstruction(questionStyle, studentLevel, interfaceLanguage = 'zh-TW') {
-    const isEn = interfaceLanguage === 'en';
+export function getQuestionSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution) {
+    let typeText = "";
+    if (type === 'multiple_choice') typeText = "選擇題 (Multiple Choice)";
+    else if (type === 'true_false') typeText = "是非題 (True/False)";
+    else if (type === 'mixed') typeText = "「選擇題」與「是非題」混合 (請盡量平均分配，各佔約 50%)";
 
-    if (isEn) {
-        let baseInstruction = [
-            "You are a senior teacher and assessment expert with 20 years of experience, specializing in designing high-quality quiz questions based on provided content.",
-            "Your task is to design a quiz based on the user-provided text or images.",
-            "Please strictly adhere to the following JSON format for the response. Do not include any Markdown markers (like ```json ... ```), return raw JSON string array only."
-        ].join("\n");
+    const bloomLabels = { remember: '記憶', understand: '理解', apply: '應用', analyze: '分析', evaluate: '評鑑', create: '創造' };
+    
+    const distributionText = Object.entries(bloomDistribution)
+        .filter(([_, c]) => c > 0)
+        .map(([level, c]) => `${bloomLabels[level] || level}: ${c} 題`)
+        .join('、');
 
-        let styleInstruction = "";
-        if (questionStyle === 'competency-based') {
-            styleInstruction = `
-**【Competency-Based Design Principles】**
-1. **Core Requirement**: Questions must go beyond simple memorization and comprehension, focusing on higher-order cognitive abilities such as "Application", "Analysis", and "Evaluation".
-2. **Mandatory Contextualization**:
-   - The "text" field of each question must begin with a **realistic and specific "scenario description"** (e.g., real-life cases, news reports, data charts, experimental settings, dialogues).
-   - The scenario description should be between 50-100 words, serving to introduce the core question.
-3. **Avoid Recall-Based Phrasing**:
-   - Strictly prohibit direct recall-based question types like "Which of the following is...", "What is the definition of...", "Which of the following is NOT a characteristic of...".
-   - The question part should guide students to apply knowledge within the scenario to make judgments, inferences, or solve problems. For example: "Based on the above scenario, how would you determine/judge if you were...?", "In this situation, what is the most reasonable explanation for...?", "Analyze the possible causes/impacts of this phenomenon."
-4. **Integration**: Encourage students to apply knowledge from the text to solve problems within the given context, rather than merely extracting information.
-5. **Design Concept**: Each question must include a 20-50 word "Design Concept" explaining the core competency or skill being tested.
-6. **Student Level**: Adjust difficulty and scenario complexity for "${studentLevel}" cognitive level.`;
-        } else {
-            styleInstruction = `
-**【Knowledge Recall Design Principles】**
-1. **Accuracy**: Questions should directly test key facts, definitions, or concepts from the text.
-2. **Clarity**: Question stems must be concise and clear, avoiding ambiguity.
-3. **Student Level**: Adjust vocabulary for "${studentLevel}" cognitive level.`;
-        }
+    // 素養導向命題核心原則 (整合用戶建議)
+    const competencyRules = `
+    【✨ 素養導向命題進階規範】
+    你必須嚴格遵守以下「素養導向」設計原則：
+    1. 必要資訊原則：題幹情境應僅保留「解題所需」的必要資訊。進行效度檢核：若刪掉某句話不影響作答，該句即為廢話，應刪除。
+    2. 拒絕「假情境」：嚴禁寫了長篇故事卻只問課本記憶內容。答案必須要求學生「從情境/文本中提取資訊」並結合「學科知識」才能判斷。
+    3. 認知負荷控制：單題題幹（情境+提問）建議精簡。國小程度應多用條列式或結構化文字；國高中可增加資訊密度，但須確保每一句都是解題線索。
+    4. 結構化呈現：關鍵數據、實驗條件或對話紀錄，請使用「條列式」或「對談格式」呈現，提升可讀性。
+    5. 真實性：情境應模擬真實世界中的問題解決，而非生硬的課本例題轉寫。
+    `;
 
-        return `${baseInstruction}
-${styleInstruction}
+    const standardRules = `
+    【知識記憶命題規範】
+    1. 專注於學科核心概念的檢索與理解。
+    2. 題意應清晰明確，避免模稜兩可的敘述。
+    `;
 
-**【Output Format Requirements (JSON Array)】**
-Please return a JSON array containing question objects.
-Structure for each object:
-- **Multiple Choice**:
-  {
-    "text": "Question text...",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct": [0], // Index of correct option (0-based), array to support multiple correct answers
-    "explanation": "Explanation...",
-    "design_concept": "Design concept..." // Only for competency-based
-  }
-- **True/False**:
-  {
-    "text": "Question text...",
-    "is_correct": true, // true for True/O, false for False/X
-    "explanation": "Explanation...",
-    "design_concept": "Design concept..." // Only for competency-based
-  }
-`;
-    } else {
-        let baseInstruction = [
-            "你是一位擁有 20 年經驗的資深教師與測驗專家，擅長根據提供的內容設計高品質的測驗題目。",
-            "你的任務是根據使用者提供的文本或圖片內容，設計出一份測驗卷。",
-            "請嚴格遵守以下的 JSON 格式回傳，不要包含任何 Markdown 標記 (如 ```json ... ```)，直接回傳純 JSON 字串陣列。"
-        ].join("\n");
+    return `
+你是一位頂尖教育評量專家。你的任務是根據提供的【學習內容】，生成 ${count} 題「${typeText}」。
 
-        let styleInstruction = "";
-        if (questionStyle === 'competency-based') {
-            styleInstruction = `
-**【素養導向出題原則 (Competency-Based)】**
-1. **核心要求**：題目必須超越單純的記憶與理解，聚焦於「應用」、「分析」、「評鑑」等高層次認知能力。
-2. **強制情境化 (Mandatory Contextualization)**：
-   - 每道題目的「text」字段必須以**真實且具體的「情境描述」**開頭（例如：生活案例、新聞報導、圖表數據、實驗場景、對話等）。
-   - 情境描述應介於 50-100 字之間，用來引入核心問題。
-3. **避免記憶式問法 (Avoid Recall-Based Phrasing)**：
-   - 嚴禁使用「下列何者為...」、「...的定義為何？」、「...的特徵不包含？」等直接詢問定義、事實或列舉的句型。
-   - 問題部分應引導學生在情境中運用知識進行判斷、推論或解決問題。例如：「根據上述情境，如果您是...會如何判斷？」、「在此情況下，最合理的解釋是？」、「請分析此現象可能的原因/影響。」
-4. **整合運用 (Integration)**：鼓勵學生將文本知識與情境結合解決問題，而非僅是提取資訊。
-5. **設計理念 (Design Concept)**：每題必須附上 20-50 字的「設計理念」，說明此題考察的核心素養或能力。
-6. **學生程度**：請根據「${studentLevel}」的認知水平調整題目的難度與情境複雜度。`;
-        } else {
-            styleInstruction = `
-**【知識記憶型出題原則 (Knowledge Recall)】**
-1. **準確性**：題目應直接考察文本中的關鍵事實、定義或概念。
-2. **清晰度**：題幹敘述需簡潔明瞭，避免模稜兩可。
-3. **學生程度**：請根據「${studentLevel}」的認知水平調整用詞。`;
-        }
+【基本規範】
+1. 題目分佈：必須**百分之百嚴格依照**指定的認知層次出題：${distributionText}。
+   - 禁止行為：不得擅自將簡單層次「升級」為高層次，反之亦然。
+   - 標籤要求：每一題的 "bloomLevel" 必須精確對應。
+2. 難易度：符合「${difficulty}」設定。
+3. 針對對象：適合「${studentLevel} 年級」學生。
+4. 語言：${language === 'english' ? 'English' : '繁體中文'}。
 
-        return `${baseInstruction}
-${styleInstruction}
+${style === 'competency-based' ? competencyRules : standardRules}
 
-**【輸出格式要求 (JSON Array)】**
-請回傳一個包含題目物件的 JSON 陣列。
-每個物件的結構如下：
-- **選擇題 (Multiple Choice)**:
-  {
-    "text": "題目敘述...",
-    "options": ["選項A", "選項B", "選項C", "選項D"],
-    "correct": [0], // 正確選項的索引 (0-based)，陣列格式以支援多選
-    "explanation": "詳解...",
-    "design_concept": "設計理念..." // 僅素養題需要
-  }
-- **是非題 (True/False)**:
-  {
-    "text": "題目敘述...",
-    "is_correct": true, // true 為 O，false 為 X
-    "explanation": "詳解...",
-    "design_concept": "設計理念..." // 僅素養題需要
-  }
-`;
+【JSON 輸出格式】
+你只能回傳一個 JSON 物件，格式如下，絕對不要包含 Markdown 標籤或額外文字：
+{
+  "quizTitle": "語意完整且專業的標題 (10字內，不含'測驗'二字)",
+  "questions": [
+    {
+      "text": "題目內容 (若為素養題需包含情境敘述)",
+      "options": ["選項A", "選項B", "選項C", "選項D"],
+      "correct": [0],
+      "bloomLevel": "對應的層次英文名 (如 remember, apply)",
+      "explanation": "詳細解析 (結合情境與知識點的說明)",
+      "design_concept": "說明此題如何體現素養導向或該認知層次"
     }
+  ]
+}
+`;
 }
 
 /**
- * 生成題目的 User Prompt
- * @param {Object} params - 參數
- * @param {number} params.count - 題目數量
- * @param {string} params.type - 題目類型 ('multiple_choice', 'true_false', 'mixed')
- * @param {string} params.difficulty - 難度
- * @param {string} params.text - 文本內容
- * @param {string} params.language - 輸出語言 ('chinese', 'english') - 這是生成題目的目標語言
- * @param {string} params.interfaceLanguage - 介面語言 ('zh-TW', 'en') - 這是Prompt本身的語言
- * @returns {string} - User Prompt
+ * 取得題目生成的 User Prompt
  */
-export function getQuestionUserPrompt({ count, type, difficulty, text, language, interfaceLanguage = 'zh-TW' }) {
-    const isEn = interfaceLanguage === 'en';
-    
-    // Output language instruction (Target Language)
-    const langInstruction = language === 'english' 
-        ? (isEn ? "Please generate questions entirely in English." : "請全程使用英文出題。")
-        : (isEn ? "Please generate questions entirely in Traditional Chinese (Taiwan)." : "請全程使用繁體中文 (Traditional Chinese, Taiwan) 出題。");
-
-    if (isEn) {
-        let typeInstruction = "";
-        if (type === 'multiple_choice') typeInstruction = `Create ${count} "Multiple Choice" questions.`;
-        else if (type === 'true_false') typeInstruction = `Create ${count} "True/False" questions.`;
-        else typeInstruction = `Create ${count} mixed questions (Multiple Choice and True/False).`;
-
-        return `
-Please design ${count} quiz questions based on the provided content.
-1. **Question Type**: ${typeInstruction}
-2. **Difficulty**: ${difficulty}.
-3. **Language**: ${langInstruction}
-4. **Content Source**:
-"""
-${text}
-"""
-        `.trim();
-    } else {
-        let typeInstruction = "";
-        if (type === 'multiple_choice') typeInstruction = `請出 ${count} 題「單選題」。`;
-        else if (type === 'true_false') typeInstruction = `請出 ${count} 題「是非題」。`;
-        else typeInstruction = `請出 ${count} 題混合題型 (包含選擇題與是非題)。`;
-
-        return `
-請根據提供的內容，設計 ${count} 題測驗。
-1. **題目類型**：${typeInstruction}
-2. **難易度**：${difficulty}。
-3. **語言**：${langInstruction}
-4. **內容來源**：
-"""
-${text}
-"""
-        `.trim();
-    }
+export function getQuestionUserPrompt({ count, bloomLevel }) {
+    return `請根據提供的參考內容，生成題目並給予一個語意完整的專業標題。`;
 }

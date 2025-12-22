@@ -1,21 +1,26 @@
 // --- 組態常數 ---
 export const CONFIG = {
-    API_URL: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+    // 基礎 API 位址
+    BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+    // 指定模型名稱 (目前穩定版本 2.5)
+    MODEL_NAME: 'gemini-2.5-flash', 
+    
     API_BATCH_SIZE: 6,
     DEBOUNCE_DELAY: 800,
-    MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
-    MAX_IMAGE_SIZE_BYTES: 4 * 1024 * 1024, // 4MB
-    MAX_TOTAL_IMAGE_SIZE_BYTES: 15 * 1024 * 1024, // 15MB
-    ADD_CONTENT_URL: 'https://asia-east1-questwiz.cloudfunctions.net/addContent',
+    MAX_FILE_SIZE_BYTES: 20 * 1024 * 1024, // 20MB
+    MAX_IMAGE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
+    MAX_TOTAL_IMAGE_SIZE_BYTES: 30 * 1024 * 1024, // 30MB
+    
+    // Cloud Function 真實網址
+    ADD_CONTENT_URL: 'https://addcontent-2xblwpocfa-de.a.run.app',
     VIEW_PAGE_URL: 'view.html',
-    EXTRACT_URL_FUNCTION_URL: 'https://asia-east1-questwiz.cloudfunctions.net/extractContentFromUrl',
-    // 【新增】YouTube 字幕擷取函式的 URL
-    GET_YOUTUBE_TRANSCRIPT_URL: 'https://asia-east1-questwiz.cloudfunctions.net/getYouTubeTranscript',
-    // [新增] 刪除題庫的雲端函式 URL 與金鑰
-    DELETE_QUIZ_FUNCTION_URL: 'https://asia-east1-questwiz.cloudfunctions.net/deleteQuizAsAdmin',
-    ADMIN_SECRET_KEY: 'your-super-secret-admin-key-12345', // 實際上應該使用更複雜的金鑰
+    EXTRACT_URL_FUNCTION_URL: 'https://extractcontentfromurl-2xblwpocfa-de.a.run.app',
+    GET_YOUTUBE_TRANSCRIPT_URL: 'https://getyoutubetranscript-2xblwpocfa-de.a.run.app',
+    DELETE_QUIZ_FUNCTION_URL: 'https://deletequizasadmin-2xblwpocfa-de.a.run.app',
+    
+    ADMIN_SECRET_KEY: 'AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g', 
 
-    // 【新增】Firebase 設定
+    // Firebase 設定
     FIREBASE_CONFIG: {
         apiKey: "AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g",
         authDomain: "questwiz.firebaseapp.com",
@@ -31,13 +36,13 @@ export const contentLoadingMessages = [ "AI 作家正在揮灑靈感，撰寫文
 
 // 台灣教育領域與議題常數
 export const TAIWAN_EDU_DOMAINS = [
-    "語文", "數學", "社會", "自然科學", "藝術", "綜合活動", "科技", "健康與體育"
+    "語文", "數學", "社會", "自然科學", "藝術", "綜合活動", "科技", "健康與體育", "其他"
 ];
 
 export const TAIWAN_EDU_ISSUES = [
     "無", "性別平等", "人權", "環境", "海洋", "品德", "生命", "法治", "科技", "資訊", 
     "能源", "安全", "防災", "家庭教育", "生涯規劃", "多元文化", "閱讀素養", "戶外教育", 
-    "國際教育", "原住民族教育"
+    "國際教育", "原住民族教育", "其他"
 ];
 
 export const TAIWAN_PUBLISHERS = [
