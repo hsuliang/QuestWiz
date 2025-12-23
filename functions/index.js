@@ -2,7 +2,8 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const axios = require("axios");
-const cheerio = require("cheerio");
+const { JSDOM } = require("jsdom");
+const { Readability } = require("@mozilla/readability");
 
 admin.initializeApp();
 
@@ -15,26 +16,86 @@ const ADMIN_SECRET_KEY = "AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g";
 setGlobalOptions({ region: "asia-east1" });
 
 /**
- * 1. 擷取網頁內容
+ * 1. 擷取網頁內容 (雙重保險版：Jina -> Local Readability)
  */
 exports.extractContentFromUrl = onRequest({ cors: true }, async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
     const { url } = req.body;
     if (!url) return res.status(400).send("Missing URL");
 
+    // 共用的 User-Agent，模擬真實瀏覽器，避免被擋
+    const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+    console.log(`Attempting to extract content for: ${url}`);
+
+    // --- 策略 A: 嘗試使用 r.jina.ai ---
     try {
-      const response = await axios.get(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" },
-        timeout: 10000 
-      });
-      const $ = cheerio.load(response.data);
-      $("script, style, nav, footer, header").remove();
-      const title = $("title").text() || "無標題";
-      const content = $("body").text().replace(/\s+/g, " ").trim();
-      return res.status(200).json({ title, content });
-    } catch (error) {
-      console.error("Extraction error:", error);
-      return res.status(500).json({ error: "無法擷取內容，請檢查網址是否有效。" });
+        const jinaUrl = `https://r.jina.ai/${url}`;
+        console.log(`Strategy A: Calling Jina (${jinaUrl})...`);
+        
+        const response = await axios.get(jinaUrl, {
+            headers: { "User-Agent": USER_AGENT },
+            timeout: 10000 // 10秒超時
+        });
+
+        const markdownContent = response.data;
+        
+        // 簡單抓取標題 (Jina 格式通常第一行是 Title: ...)
+        let title = "匯入的文章";
+        const titleMatch = markdownContent.match(/^Title:\s*(.+)$/m) || markdownContent.match(/^#\s+(.+)$/m);
+        if (titleMatch) {
+            title = titleMatch[1].trim();
+        }
+
+        console.log("Strategy A (Jina) success.");
+        return res.status(200).json({ 
+            title: title, 
+            content: markdownContent,
+            source: 'jina'
+        });
+
+    } catch (jinaError) {
+        console.warn("Strategy A (Jina) failed:", jinaError.message);
+        // 繼續執行策略 B
+    }
+
+    // --- 策略 B: Fallback 使用本地 JSDOM + Readability ---
+    try {
+        console.log("Strategy B: Fallback to local Readability...");
+        
+        const response = await axios.get(url, {
+            headers: { "User-Agent": USER_AGENT },
+            timeout: 10000 
+        });
+
+        const dom = new JSDOM(response.data, { url: url });
+        const reader = new Readability(dom.window.document);
+        const article = reader.parse();
+
+        if (article) {
+            console.log("Strategy B (Readability) success.");
+            return res.status(200).json({ 
+                title: article.title || "無標題", 
+                content: article.textContent.trim(),
+                source: 'readability'
+            });
+        } else {
+            console.warn("Strategy B (Readability) returned null article.");
+            // 最後手段：直接抓 body text
+            const fallbackContent = dom.window.document.body.textContent.replace(/\s+/g, " ").trim();
+            return res.status(200).json({ 
+                title: dom.window.document.title || "無標題", 
+                content: fallbackContent,
+                source: 'raw_text'
+            });
+        }
+
+    } catch (localError) {
+        console.error("All strategies failed.", localError);
+        // 回傳詳細錯誤訊息以便除錯
+        return res.status(500).json({ 
+            error: `擷取失敗。Jina 錯誤: ${localError.message || 'Unknown'}` 
+        });
     }
 });
 
