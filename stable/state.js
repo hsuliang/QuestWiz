@@ -1,147 +1,114 @@
-// --- 狀態管理模組 ---
-// 負責管理應用程式的全域狀態，例如生成的題目、上傳的圖片、計時器 ID 等
+import { STORAGE_KEYS } from './constants.js';
 
-let generatedQuestions = [];
-let uploadedImages = [];
-let keyTimerInterval = null;
-let currentRequestController = null; // 用於儲存當前 API 請求的 AbortController
-let sortableInstance = null; // 用於儲存 SortableJS 實例
-let isAdmin = false; // [新增] 管理員模式旗標
+// --- 狀態管理模組 (穩定強化版) ---
 
-// --- Getter / Setter ---
+export const questionState = {
+    generatedQuestions: [],
+    uploadedImages: []
+};
 
-export function getGeneratedQuestions() {
-    return [...generatedQuestions];
+export const requestState = {
+    // 追蹤進行中的任務：{ taskName: { id, controller } }
+    activeTasks: new Map(),
+    keyTimerInterval: null,
+    sortableInstance: null
+};
+
+export const appState = {
+    isAdmin: false
+};
+
+/**
+ * 開始一個新任務 (自動處理 Abort 與 Busy 標記)
+ */
+export function startTask(taskName) {
+    // 1. 如果舊任務還在跑，先切斷它
+    if (requestState.activeTasks.has(taskName)) {
+        const oldTask = requestState.activeTasks.get(taskName);
+        if (oldTask.controller) oldTask.controller.abort();
+    }
+
+    // 2. 建立新任務資訊
+    const requestId = Date.now();
+    const controller = new AbortController();
+    
+    requestState.activeTasks.set(taskName, {
+        id: requestId,
+        controller: controller
+    });
+
+    return { requestId, signal: controller.signal };
 }
 
+/**
+ * 結束一個任務
+ */
+export function endTask(taskName) {
+    requestState.activeTasks.delete(taskName);
+}
+
+/**
+ * 檢查目前的請求 ID 是否依然有效 (防止舊請求覆蓋新請求)
+ */
+export function isTaskValid(taskName, requestId) {
+    const current = requestState.activeTasks.get(taskName);
+    return current && current.id === requestId;
+}
+
+export function isBusy(taskName) {
+    return requestState.activeTasks.has(taskName);
+}
+
+// --- 相容性 Getter / Setter ---
+
+export function getGeneratedQuestions() { return [...questionState.generatedQuestions]; }
 export function updateGeneratedQuestions(updater) {
-  if (typeof updater !== 'function') {
-    throw new Error('updateGeneratedQuestions requires a function');
-  }
-
-  const next = updater([...generatedQuestions]);
-  if (!Array.isArray(next)) {
-    throw new Error('GeneratedQuestions must be an array');
-  }
-
-  generatedQuestions = next;
-  saveDraftState();
-}
-
-export function setGeneratedQuestions(questions) {
-    generatedQuestions = questions;
+    const next = updater([...questionState.generatedQuestions]);
+    questionState.generatedQuestions = next;
     saveDraftState();
 }
-
-export function getUploadedImages() {
-    return uploadedImages.map(img => ({ ...img }));
-}
-
-export function setUploadedImages(images) {
-    uploadedImages = images;
-    saveDraftState();
-}
-
-export function getKeyTimerInterval() {
-    return keyTimerInterval;
-}
-
-export function setKeyTimerInterval(intervalId) {
-    keyTimerInterval = intervalId;
-}
-
+export function setGeneratedQuestions(questions) { questionState.generatedQuestions = questions; saveDraftState(); }
+export function getUploadedImages() { return questionState.uploadedImages.map(img => ({ ...img })); }
+export function setUploadedImages(images) { questionState.uploadedImages = images; saveDraftState(); }
+export function getKeyTimerInterval() { return requestState.keyTimerInterval; }
+export function setKeyTimerInterval(id) { requestState.keyTimerInterval = id; }
 export function getCurrentRequestController() {
-    return currentRequestController;
+    // 為了相容，回傳最後一個活動中的 controller
+    const tasks = Array.from(requestState.activeTasks.values());
+    return tasks.length > 0 ? tasks[tasks.length - 1].controller : null;
 }
-
-export function setCurrentRequestController(controller) {
-    currentRequestController = controller;
+export function setCurrentRequestController(ctrl) { 
+    // 已棄用：改用 startTask 管理
 }
-
-export function getSortableInstance() {
-    return sortableInstance;
-}
-
-export function setSortableInstance(instance) {
-    sortableInstance = instance;
-}
-
-export function setAdminMode(status) {
-    isAdmin = !!status; // 確保是布林值
-}
-
-export function isAdminMode() {
-    return isAdmin;
-}
+export function getSortableInstance() { return requestState.sortableInstance; }
+export function setSortableInstance(ins) { requestState.sortableInstance = ins; }
+export function setAdminMode(status) { appState.isAdmin = !!status; }
+export function isAdminMode() { return appState.isAdmin; }
 
 // --- 草稿儲存邏輯 ---
 
-const DRAFT_KEY = 'questwiz_draft_v1';
 let saveTimeout = null;
-
-/**
- * 實際執行儲存的內部函式
- */
 function performSave() {
-    // 注意：圖片 Base64 可能會超過 localStorage 上限，這裡做個簡單檢查
-    let imagesToSave = uploadedImages;
     try {
-        const imagesSize = JSON.stringify(uploadedImages).length;
-        if (imagesSize > 2 * 1024 * 1024) { // 超過 2MB 就不存圖片
-            console.warn('圖片過大，略過草稿儲存');
-            imagesToSave = []; 
-        }
-
-        const draftData = {
-            generatedQuestions,
-            uploadedImages: imagesToSave,
-            timestamp: Date.now()
-        };
-        
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-        // console.log('Draft saved successfully');
-    } catch (e) {
-        console.error('草稿儲存失敗 (可能是空間不足):', e);
-    }
+        const draftData = { generatedQuestions: questionState.generatedQuestions, uploadedImages: questionState.uploadedImages, timestamp: Date.now() };
+        localStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(draftData));
+    } catch (e) { console.error('草稿儲存失敗:', e); }
 }
-
-/**
- * 儲存當前草稿到 localStorage (防抖動版本)
- * 頻繁呼叫時會延遲執行，優化效能
- */
 export function saveDraftState() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        performSave();
-        saveTimeout = null;
-    }, 500); // 延遲 500ms 執行
+    if (saveTimeout) clearTimeout(saveTimeout); 
+    saveTimeout = setTimeout(() => { performSave(); saveTimeout = null; }, 500);
 }
-
-/**
- * 立即執行儲存 (忽略防抖動)
- * 用於關鍵操作或視窗關閉前
- */
 export function saveDraftStateImmediately() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    performSave();
+    if (saveTimeout) clearTimeout(saveTimeout); performSave();
 }
-
-// 監聽視窗關閉事件，確保最後一刻有存檔
-window.addEventListener('beforeunload', () => {
-    saveDraftStateImmediately();
-});
-
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => { saveDraftStateImmediately(); });
+}
 export function loadDraftState() {
     try {
-        const draftString = localStorage.getItem(DRAFT_KEY);
+        const draftString = localStorage.getItem(STORAGE_KEYS.DRAFT);
         if (!draftString) return null;
         return JSON.parse(draftString);
-    } catch (e) {
-        console.error('草稿讀取失敗:', e);
-        return null;
-    }
+    } catch (e) { return null; }
 }
-
-export function clearDraftState() {
-    localStorage.removeItem(DRAFT_KEY);
-}
+export function clearDraftState() { localStorage.removeItem(STORAGE_KEYS.DRAFT); }
