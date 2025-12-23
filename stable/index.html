@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ㄚ亮笑長的出題助手</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <link rel="icon" type="image/jpeg" href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIbGNtcwIQAABtbnRyUkdCIFhZWiAH4gADABQACQAOAB1hYCNzcTVNGVAAAAABzYXdzYCNybAAAAAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWhhbmRhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkZXNjAAAAAAAAAB5jcmVhdGVkIGJ5IHNhd3NjcHRybCBU29sa2l0LiAyLjMAAAAADGN1cnYAAAAAAAAEAAAAAAUACgAPABQAGQAeACMAKAAtADIANwA7AEAARQBKAE8AVABZAF4AYwBoAG0AcgB3AHwAgQCGAIsAkACVAJoAnwCkAKkArgCyALcAvADBAMYAywDQANUA2wDgAOUA6wDwAPYA+wEBAQcBDQETARkBHwElASsBMgE4AT4BRQFMAVIBWQFgAWcBbgF3AXwBgwGLAZwBqQG1 AcEByQHRAdkB4QHpAfIB+gIDAgwCFAIdAiYCLwI cuartoAkECSwJUAl0CYwJtAoACjwKgArQCsAK2AsgC3gLwAwYDIwMmMzkDWwNzA3oDhQOLA5YDogOuA7oDxwPTA+AD7AP5BAYEEwQgBC0EOwRIBFUEYwRxBH4EjASaBKgEtgTEBNME4QTwBP4FDQUcBSsFOgVJBVgFZwV3BYYFlgWmBbUFxQXVBeUF9gYGBhYGJwY3BkgGWQZqBnsGjAadBq8GwAbRBuMG9QcHBxkHKwc9B0EHYQd0B4YHmQesB78H0gflB/gICwgfCDIIRghaCG4IggiWCKoIvgjSCOcI+wkQCSUJOglPCWQJeQmPCaQJugnPCeUJ+woRCicKPQpUCmoKgQqYCq4KxQrcCvMLCwsiCzkLUQtpC4ALmAuwC8gL4Qv5DBIMKgxDDFwMdQyODKcMwAzZDPMNDQ0mDUANWg10DY4NqQ3DDd4N+A4TDi4OSQ5kDn8Omw62DtIO7g8JDyUPQQ9eD3oPlg+zD88P7BAJECYQQxBhEH4QmxC5ENcQ9RETETERTxFtEYwRqhHJEfASDxMlE0gTow Wilhelmina Triesenberg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    
+    <!-- QRCode library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body class="text-gray-800">
+    <input type="radio" name="theme" id="theme-strawberry" class="sr-only">
+    <input type="radio" name="theme" id="theme-mint" class="sr-only">
+    <input type="radio" name="theme" id="theme-lavender" class="sr-only" checked>
+    <input type="radio" name="theme" id="theme-orange" class="sr-only">
+    <input type="radio" name="theme" id="theme-blueberry" class="sr-only">
+    <input type="radio" name="theme" id="theme-caramel-pudding" class="sr-only">
+    <input type="radio" name="theme" id="theme-burgundy-red" class="sr-only">
+
+
+    <div id="page-wrapper">
+        <div class="container mx-auto p-4 md:p-8">
+
+            <header class="text-center mb-10 relative">
+                <div class="flex justify-center items-center mb-4">
+                    <img src="https://hsuliang.github.io/Aliang.png" alt="ㄚ亮校長練功坊 Logo" class="h-12 md:h-16 mr-2">
+                    <h1 class="text-4xl md:text-5xl font-bold themed-heading relative">
+                        <span data-i18n="app_title">ㄚ亮笑長的出題助手</span>
+                        <span class="absolute -top-2 -right-8 text-sm bg-gradient-to-r from-yellow-400 to-red-500 text-white px-2 py-0.5 rounded-full shadow-md animate-pulse">AI</span>
+                    </h1>
+                </div>
+                <p class="text-lg text-gray-500" data-i18n="app_subtitle">您教學的好夥伴，快速便利生成多個教學平台的題庫格式</p>
+            </header>
+
+            <main id="main-container" class="flex flex-col lg:flex-row gap-8">
+                
+                <div id="controls-column" class="lg:w-2/5 space-y-8">
+                    
+                    <div id="common-settings-card" class="themed-card common-settings-container bg-white p-6 rounded-2xl shadow-lg border">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="themed-heading text-2xl font-bold flex items-baseline">
+                                <span data-i18n="settings_title">常用設定</span>
+                                <span id="api-key-timer" class="ml-3 text-sm font-medium themed-accent-text" style="display: none;"></span>
+                            </h2>
+                            <button id="collapse-settings-btn" class="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="收合/展開設定">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div id="common-settings-content" class="collapsible-content">
+                            <div class="border-b border-gray-200">
+                                <nav class="settings-tab-nav -mb-px flex space-x-4" aria-label="Settings Tabs" role="tablist">
+                                    <button id="settings-tab-api" class="settings-tab-btn active" role="tab" data-i18n="tab_api">API 金鑰</button>
+                                    <button id="settings-tab-level" class="settings-tab-btn" role="tab" data-i18n="tab_level">學生程度</button>
+                                    <button id="settings-tab-theme" class="settings-tab-btn" role="tab" data-i18n="tab_theme">布景主題</button>
+                                    <button id="settings-tab-layout" class="settings-tab-btn" role="tab" data-i18n="tab_layout">介面</button>
+                                    <button id="settings-tab-language" class="settings-tab-btn" role="tab" data-i18n="tab_language">語言</button>
+                                </nav>
+                            </div>
+                            <div class="mt-4">
+                                <div id="settings-content-api" class="settings-tab-content active relative" role="tabpanel">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <label class="font-bold text-gray-700 text-sm" data-i18n="api_settings_label">Gemini API 金鑰設定</label>
+                                            <button type="button" id="toggle-api-steps-btn" class="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 select-none transition-colors focus:outline-none">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" id="api-steps-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                                <span data-i18n="api_steps_btn">操作步驟</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="api-steps-container" class="hidden mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600">
+                                        <div class="font-bold text-gray-800 mb-2" data-i18n="api_steps_title">取得 Gemini API Key 步驟：</div>
+                                        <ol class="list-decimal pl-4 space-y-1 leading-relaxed">
+                                            <li data-i18n="api_step_1">登入您的 Google 帳號。</li>
+                                            <li data-i18n-html="api_step_2">前往 <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline font-medium">Google AI Studio</a>。</li>
+                                            <li data-i18n-html="api_step_3">點擊頁面左下方的 <span class="bg-gray-200 px-1 rounded text-gray-700">Get API key</span> 按鈕。</li>
+                                            <li data-i18n-html="api_step_4">點擊頁面右上角藍色的 <span class="bg-blue-50 text-blue-600 px-1 rounded font-semibold">Create API key</span> 按鈕。</li>
+                                            <li data-i18n-html="api_step_5">選擇專案：若無專案，點擊 <span class="font-semibold">Select a Cloud Project ➔ Create project</span>。</li>
+                                            <li data-i18n-html="api_step_6">為您的 API Key 命名 (選用)。</li>
+                                            <li data-i18n-html="api_step_7">複製生成的金鑰 (以 AIza 開頭)，貼入下方欄位。</li>
+                                        </ol>
+                                    </div>
+
+                                    <div class="relative">
+                                        <input type="password" id="api-key-input" class="w-full p-2 border border-gray-300 rounded-md text-sm pr-10" placeholder="請貼上您的 API Key" data-i18n-placeholder="api_placeholder">
+                                        <button type="button" id="toggle-api-key-visibility" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 focus:outline-none">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="flex gap-2 mt-2">
+                                        <button id="save-api-key-btn" class="flex-1 text-sm text-white font-semibold bg-blue-500 hover:bg-blue-600 p-2 rounded-lg transition-colors" data-i18n="save_btn">儲存</button>
+                                        <button id="clear-api-key-btn" class="flex-1 text-sm text-gray-600 font-semibold bg-gray-200 hover:bg-gray-300 p-2 rounded-lg transition-colors" data-i18n="clear_btn">清除</button>
+                                    </div>
+                                    <p class="text-xs text-red-500 mt-2 font-semibold" data-i18n="api_expiry_warning">
+                                        金鑰將暫存 2 小時，關閉分頁後即失效。請勿在公用電腦上儲存。
+                                    </p>
+                                </div>
+                                <div id="settings-content-level" class="settings-tab-content" role="tabpanel">
+                                     <div>
+                                        <label for="student-level-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="level_label">請選擇學生程度 (K12)：</label>
+                                        <select id="student-level-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm student-level-sync outline-none">
+                                            <option value="" disabled selected data-i18n="level_label">請選擇學生程度...</option>
+                                            <option value="1-2" data-i18n="level_1_2">低年級</option> 
+                                            <option value="3-4" data-i18n="level_3_4">中年級</option> 
+                                            <option value="5-6" data-i18n="level_5_6">高年級</option> 
+                                            <option value="7-9" data-i18n="level_7_9">國中</option> 
+                                            <option value="9-12" data-i18n="level_9_12">高中</option>
+                                            <option value="其他">其他</option>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-2" data-i18n="level_hint">此設定將同時影響「AI生成內容」的文章難易度與「生成題目」的題目深淺。</p>
+                                     </div>
+                                </div>
+                                <div id="settings-content-theme" class="settings-tab-content" role="tabpanel">
+                                    <div class="grid grid-cols-7 gap-2">
+                                        <label for="theme-strawberry" title="草莓奶昔" class="theme-chooser"></label>
+                                        <label for="theme-mint" title="薄荷蘇打" class="theme-chooser"></label>
+                                        <label for="theme-lavender" title="薰衣草田" class="theme-chooser"></label>
+                                        <label for="theme-orange" title="夏日香橙" class="theme-chooser"></label>
+                                        <label for="theme-blueberry" title="藍莓鬆餅" class="theme-chooser"></label>
+                                        <label for="theme-caramel-pudding" title="焦糖布丁" class="theme-chooser"></label>
+                                        <label for="theme-burgundy-red" title="勃根地紅" class="theme-chooser"></label>
+                                    </div>
+                                </div>
+                                <div id="settings-content-layout" class="settings-tab-content" role="tabpanel">
+                                    <button id="layout-toggle-btn" class="w-full flex items-center justify-center text-sm text-gray-600 font-semibold bg-gray-100 hover:bg-gray-200 p-2 rounded-lg transition-colors" data-i18n="layout_btn">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                        切換左右欄
+                                    </button>
+                                </div>
+                                <div id="settings-content-language" class="settings-tab-content" role="tabpanel">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="language_label">介面語言選擇：</label>
+                                    <div class="flex gap-x-4">
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="language" value="zh-TW" class="form-radio text-indigo-600 focus:ring-indigo-500" checked>
+                                            <span class="ml-2">繁體中文</span>
+                                        </label>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="radio" name="language" value="en" class="form-radio text-indigo-600 focus:ring-indigo-500">
+                                            <span class="ml-2">English</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="themed-card bg-white p-6 rounded-2xl shadow-lg border relative flex flex-col">
+                        <div class="flex justify-between items-center mb-5">
+                            <h2 class="themed-heading text-2xl font-bold flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                <span data-i18n="provide_content_title">提供內容</span>
+                            </h2>
+                        </div>
+                        
+                        <div class="flex-grow">
+                            <div class="border-b border-gray-200 mb-6">
+                                <div class="tabs-container">
+                                    <nav class="-mb-px flex space-x-2 md:space-x-4" aria-label="Tabs" role="tablist">
+                                        <button id="tab-text" class="tab-btn active flex items-center" role="tab" aria-selected="true" aria-controls="content-text">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                                            <span data-i18n="tab_content_text">輸入內容</span>
+                                        </button>
+                                        <button id="tab-image" class="tab-btn flex items-center" role="tab" aria-selected="false" aria-controls="content-image">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" /></svg>
+                                            <span data-i18n="tab_content_image">上傳圖片</span>
+                                        </button>
+                                        <button id="tab-url" class="tab-btn flex items-center" role="tab" aria-selected="false" aria-controls="content-url">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd" /></svg>
+                                             <span data-i18n="tab_content_url">從網址匯入</span>
+                                        </button>
+                                        <button id="tab-ai" class="tab-btn" role="tab" aria-selected="false" aria-controls="content-ai" data-i18n="tab_content_ai">✨ AI生成內容</button>
+                                    </nav>
+                                </div>
+                            </div>
+
+                        <!-- 輸入內容分頁 -->
+                        <div id="content-text" class="tab-content active" role="tabpanel" aria-labelledby="tab-text">
+                            <div class="relative">
+                                <!-- 文字輸入框：加上虛線框與 peer 類別 -->
+                                <textarea id="text-input" rows="10" 
+                                    class="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors outline-none bg-white peer placeholder-transparent" 
+                                    placeholder=" "></textarea>
+                                
+                                <!-- 中央引導語：當 textarea 為空 (placeholder-shown) 時顯示 -->
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none peer-focus:opacity-0 peer-[:not(:placeholder-shown)]:opacity-0 transition-opacity duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <div class="text-center px-4">
+                                        <label for="file-input" class="text-indigo-600 font-bold hover:underline cursor-pointer pointer-events-auto">點擊此處上傳檔案</label>
+                                        <span class="text-gray-500 font-medium"> 或拖曳檔案到這裡</span>
+                                        <p class="text-xs text-gray-400 mt-2">支援 .txt, .pdf 格式(上限20Mb)</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 flex justify-between items-center">
+                                <div>
+                                    <input type="file" id="file-input" class="hidden" accept=".txt,.pdf">
+                                    <p id="file-name-display" class="inline text-sm text-gray-500 font-medium"></p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button id="download-txt-btn" class="bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition duration-300 flex items-center text-sm hidden">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        <span data-i18n="download_txt_btn">下載 .txt</span>
+                                    </button>
+                                    <button id="share-content-btn" class="bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200 transition duration-300 flex items-center text-sm hidden">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" /></svg>
+                                        <span data-i18n="share_content_btn">分享內容</span>
+                                    </button>
+                                </div>
+                            </div>
+                             <p id="file-error-display" class="mt-2 text-sm text-red-600 font-semibold"></p>
+                        </div>
+
+                            <div id="content-image" class="tab-content">
+                                <!-- 改為 div 以移除全面點擊效果 -->
+                                <div id="image-drop-zone" class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg bg-white transition hover:bg-gray-50">
+                                    <svg class="h-10 w-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    <div class="text-center px-4">
+                                        <!-- 只有這裡可以點擊 -->
+                                        <label for="image-input" class="text-indigo-600 font-bold hover:underline cursor-pointer" data-i18n="image_upload_click">點擊此處上傳圖片</label>
+                                        <span class="text-gray-500 font-medium" data-i18n="image_upload_drag"> 或拖曳檔案到這裡</span>
+                                        <p class="text-xs text-gray-400 mt-2" data-i18n="image_format_hint">支援 .jpg, .png, .gif, .webp 格式</p>
+                                    </div>
+                                    <input type="file" id="image-input" class="hidden" accept="image/*" multiple>
+                                </div>
+                                <div id="image-preview-container" class="mt-4 grid grid-cols-3 gap-2"></div>
+                            </div>
+
+                            <div id="content-url" class="tab-content" role="tabpanel" aria-labelledby="tab-url">
+                                <div class="space-y-4">
+                                     <div class="space-y-2">
+                                        <label class="block text-sm font-medium text-gray-700" data-i18n="url_source_label">請選擇網址來源類型：</label>
+                                        <div class="flex gap-x-4 rounded-lg bg-gray-100 p-2">
+                                            <label class="flex-1 text-center cursor-pointer">
+                                                <input type="radio" name="url-type" id="url-type-web" value="web" class="sr-only peer" checked>
+                                                <span class="block w-full p-2 rounded-md text-sm font-semibold text-gray-500 peer-checked:bg-white peer-checked:themed-accent-text shadow-sm" data-i18n="url_type_web">一般網頁</span>
+                                            </label>
+                                            <label class="flex-1 text-center cursor-pointer">
+                                                <input type="radio" name="url-type" id="url-type-youtube" value="youtube" class="sr-only peer" disabled>
+                                                <span class="block w-full p-2 rounded-md text-sm font-semibold text-gray-500 peer-checked:bg-white peer-checked:themed-accent-text shadow-sm"><a href="https://chromewebstore.google.com/detail/youtube-summary-with-chat/nmmicjeknamkfloonkhhcjmomieiodli" target="_blank" style="color: red;" data-i18n="url_type_youtube">YouTube 影片(替代方案)</a></span>
+                                            </label>
+                                        </div>
+                                     </div>
+                                     <div>
+                                        <label for="url-input" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="url_input_label">請貼上網址 (URL)：</label>
+                                        <input type="url" id="url-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="https://zh.wikipedia.org/wiki/太陽系" data-i18n-placeholder="url_input_placeholder">
+                                     </div>
+                                     <button id="extract-from-url-btn" class="w-full themed-button-primary font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                                        <span data-i18n="extract_btn">擷取內容</span>
+                                     </button>
+                                </div>
+                            </div>
+                            
+                            <div id="content-ai" class="tab-content" role="tabpanel" aria-labelledby="tab-ai">
+                                <div class="space-y-4">
+                                     <div>
+                                        <label for="topic-input" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_topic_label">請輸入測驗主題、單字或語詞：</label>
+                                        <input type="text" id="topic-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="例如：光合作用、永續發展、apple, banana, run..." data-i18n-placeholder="ai_topic_placeholder">
+                                     </div>
+                                     
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                         <div>
+                                            <label for="student-level-select-content" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="level_label">請選擇學生程度 (K12)：</label>
+                                            <select id="student-level-select-content" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 student-level-sync">
+                                                <option value="" disabled selected data-i18n="level_label">請選擇學生程度...</option>
+                                                <option value="1-2" data-i18n="level_1_2">低年級</option> 
+                                                <option value="3-4" data-i18n="level_3_4">中年級</option> 
+                                                <option value="5-6" data-i18n="level_5_6">高年級</option> 
+                                                <option value="7-9" data-i18n="level_7_9">國中</option> 
+                                                <option value="9-12" data-i18n="level_9_12">高中</option>
+                                                <option value="其他" data-i18n="level_other">其他</option>
+                                            </select>
+                                         </div>
+                                         <div>
+                                            <label for="text-type-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_text_type_label">請選擇文本類型：</label>
+                                            <select id="text-type-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                                <option value="科普說明文" selected data-i18n="text_type_expository">科普說明文</option>
+                                                <option value="情境故事文" data-i18n="text_type_story">情境故事文</option>
+                                                <option value="議論文" data-i18n="text_type_argumentative">議論文</option>
+                                                <option value="實用操作說明" data-i18n="text_type_practical">實用操作說明</option>
+                                                <option value="對話式劇本" data-i18n="text_type_script">對話式劇本</option>
+                                                <option value="custom" data-i18n="text_type_custom">自訂...</option>
+                                            </select>
+                                            <input type="text" id="custom-text-type-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂文本類型..." data-i18n-placeholder="custom_text_type_placeholder">
+                                         </div>
+                                     </div>
+                                     <div>
+                                        <label for="learning-objectives-input" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_objectives_label">請輸入核心學習目標或關鍵詞彙 (條列式，AI會將其融入文章中)：</label>
+                                        <textarea id="learning-objectives-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="例如：&#10;1. 理解光合作用需要光、水和二氧化碳。&#10;2. 知道會產生葡萄糖和氧氣。" data-i18n-placeholder="ai_objectives_placeholder"></textarea>
+                                     </div>
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                         <div>
+                                            <label for="tone-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_tone_label">請選擇寫作語氣：</label>
+                                            <select id="tone-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                                <option value="客觀中立" selected data-i18n="tone_neutral">客觀中立</option>
+                                                <option value="活潑有趣" data-i18n="tone_lively">活潑有趣</option>
+                                                <option value="嚴謹學術" data-i18n="tone_academic">嚴謹學術</option>
+                                                <option value="循循善誘" data-i18n="tone_persuasive">循循善誘</option>
+                                                <option value="custom" data-i18n="tone_custom">自訂...</option>
+                                            </select>
+                                            <input type="text" id="custom-tone-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂寫作語氣..." data-i18n-placeholder="custom_tone_placeholder">
+                                         </div>
+                                         <div>
+                                            <label for="output-lang-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="output_lang_label">輸出語言模式：</label>
+                                            <select id="output-lang-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                                <option value="auto" selected data-i18n="lang_mode_auto">自動偵測 (依輸入而定)</option>
+                                                <option value="full-english" data-i18n="lang_mode_english">全英文 (沉浸式閱讀)</option>
+                                                <option value="bilingual" data-i18n="lang_mode_bilingual">中英對照 (教學導覽)</option>
+                                                <option value="full-chinese" data-i18n="lang_mode_chinese">全中文 (概念解釋)</option>
+                                            </select>
+                                         </div>
+                                     </div>
+                                     <div class="flex items-center justify-center pt-2">
+                                         <input id="competency-based-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                         <label for="competency-based-checkbox" class="ml-2 block text-sm font-medium text-gray-900" data-i18n="competency_mode">✨ 啟用素養導向模式</label>
+                                         <span class="ml-2 text-xs text-gray-500" data-i18n="competency_mode_hint">(AI將生成情境式文章)</span>
+                                     </div>
+                                     <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                                         <button id="edit-prompt-btn" class="w-full sm:w-auto flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition duration-300 flex items-center justify-center text-sm">
+                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                             <span data-i18n="edit_prompt_btn">預覽/修改提示詞</span>
+                                         </button>
+                                         <button id="generate-content-btn" class="w-full sm:w-auto flex-1 themed-button-primary font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+                                            <span data-i18n="generate_content_btn">生成學習內文</span>
+                                         </button>
+                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto pt-6 border-t border-gray-200/60 flex justify-end">
+                            <button id="clear-content-btn" class="themed-button-danger-text flex items-center text-sm font-semibold transition-colors group">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.995L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <span data-i18n="clear_content_btn">清除所有內容</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="themed-card bg-white p-6 rounded-2xl shadow-lg border">
+                        <h2 class="themed-heading text-2xl font-bold mb-5 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                            <span data-i18n="quiz_settings_title">題目生成設定</span>
+                        </h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <!-- 試卷標題：橫跨兩欄，確保寬敞 -->
+                            <div class="sm:col-span-2">
+                                <label for="quiz-title-input" class="block text-sm font-bold text-gray-700 mb-1" data-i18n="quiz_title_label">試卷標題：<span class="text-xs font-normal text-indigo-500 ml-1">AI生成試題後會自動填入</span></label>
+                                <input type="text" id="quiz-title-input" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="也可現在自行填入" data-i18n-placeholder="quiz_title_placeholder">
+                            </div>
+                            <div>
+                                <label for="num-questions" class="block text-sm font-medium text-gray-700" data-i18n="num_questions_label">題目數量：</label>
+                                <input type="number" id="num-questions" value="5" min="1" max="30" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <p class="text-xs text-gray-500 mt-1" data-i18n="num_questions_hint">單次最多可生成30題。</p>
+                            </div>
+                            <div>
+                                <label for="format-select" class="block text-sm font-medium text-gray-700" data-i18n="export_format_label">匯出格式：</label>
+                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="" disabled selected data-i18n="format_select_placeholder">請選擇...</option>
+                                    <option value="wordwall" data-i18n="format_wordwall">Wordwall (Excel)</option>
+                                    <option value="kahoot" data-i18n="format_kahoot">Kahoot (Excel)</option>
+                                    <option value="wayground" data-i18n="format_wayground">Wayground (Excel)</option>
+                                    <option value="loilonote" data-i18n="format_loilonote">LoiLoNote (Excel)</option>
+                                    <option value="blooket" data-i18n="format_blooket">Blooket (CSV)</option>
+                                    <option value="gimkit" data-i18n="format_gimkit">Gimkit (CSV)</option>
+                                    <option value="pdf" data-i18n="format_pdf">PDF 考卷 (A4)</option>
+                                    <option value="txt" data-i18n="format_txt">純文字檔 (.txt)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="question-type-select" class="block text-sm font-medium text-gray-700" data-i18n="question_type_label">題目類型：</label>
+                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="multiple_choice" selected data-i18n="type_multiple_choice">選擇題</option> 
+                                    <option value="true_false" data-i18n="type_true_false">是非題</option> 
+                                    <option value="mixed" data-i18n="type_mixed">是非+選擇題</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="difficulty-select" class="block text-sm font-medium text-gray-700" data-i18n="difficulty_label">題目難度：</label>
+                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="中等" selected data-i18n="difficulty_medium">中等 (預設)</option> 
+                                    <option value="簡單" data-i18n="difficulty_easy">簡單</option> 
+                                    <option value="困難" data-i18n="difficulty_hard">困難</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="student-level-select-quiz" class="block text-sm font-medium text-gray-700" data-i18n="level_label">學生程度 (K12)：</label>
+                                <select id="student-level-select-quiz" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 student-level-sync">
+                                    <option value="" disabled selected data-i18n="level_label">請選擇學生程度...</option>
+                                    <option value="1-2" data-i18n="level_1_2">低年級</option> 
+                                    <option value="3-4" data-i18n="level_3_4">中年級</option> 
+                                    <option value="5-6" data-i18n="level_5_6">高年級</option> 
+                                    <option value="7-9" data-i18n="level_7_9">國中</option> 
+                                    <option value="9-12" data-i18n="level_9_12">高中</option>
+                                    <option value="其他" data-i18n="level_other">其他</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="question-style-select" class="block text-sm font-medium text-gray-700" data-i18n="question_style_label">出題風格：</label>
+                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="knowledge-recall" selected data-i18n="style_knowledge">知識記憶型 (預設)</option> 
+                                    <option value="competency-based" data-i18n="style_competency">✨ 素養導向型</option>
+                                </select>
+                            </div>
+
+                            <!-- 布魯姆進階勾選區 -->
+                            <div class="sm:col-span-2 mt-4">
+                                <button id="toggle-bloom-btn" class="w-full text-sm font-bold text-gray-700 flex items-center justify-start p-1 hover:bg-gray-50 rounded-lg transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                                    <span data-i18n="tab_bloom">自訂認知層次</span>
+                                    <svg id="bloom-arrow" class="h-4 w-4 ml-2 transition-transform text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                <div id="bloom-options-container" class="mt-3 grid grid-cols-3 gap-3 hidden border-t border-gray-100 pt-3">
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="remember" class="bloom-checkbox mr-1"> <span data-i18n="bloom_remember">記憶</span></label>
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="understand" class="bloom-checkbox mr-1"> <span data-i18n="bloom_understand">理解</span></label>
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="apply" class="bloom-checkbox mr-1"> <span data-i18n="bloom_apply">應用</span></label>
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="analyze" class="bloom-checkbox mr-1"> <span data-i18n="bloom_analyze">分析</span></label>
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="evaluate" class="bloom-checkbox mr-1"> <span data-i18n="bloom_evaluate">評鑑</span></label>
+                                    <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="create" class="bloom-checkbox mr-1"> <span data-i18n="bloom_create">創造</span></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                             <button id="regenerate-btn" class="hidden themed-button-primary font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center" data-i18n="btn_generate">開始出題</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="preview-column" class="lg:w-3/5 themed-card bg-white p-6 rounded-2xl shadow-lg border relative min-h-[500px] flex flex-col">
+                    <div class="border-b border-gray-200 mb-5">
+                        <nav class="-mb-px flex space-x-6">
+                            <button id="work-tab-edit" class="work-tab-btn active flex items-center pb-3 text-lg font-bold">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                <span data-i18n="tab_edit">編輯試卷</span>
+                            </button>
+                            <button id="work-tab-library" class="work-tab-btn flex items-center pb-3 text-lg font-bold">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                                <span data-i18n="tab_community">題庫大廳</span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Editor Content -->
+                    <div id="work-content-edit" class="work-tab-content active flex flex-col flex-grow">
+                        <div id="preview-loader" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center z-10 hidden">
+                            <p id="loading-text" class="text-lg font-semibold text-gray-700 text-center" data-i18n="loading_questions">AI 正在為您生成題目...</p>
+                        </div>
+                        
+                        <div id="preview-placeholder" class="flex-grow flex flex-col items-center justify-center text-center text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                            <p class="text-lg font-semibold text-gray-500" data-i18n="preview_placeholder">請在左側提供內容並設定選項</p>
+                        </div>
+
+                        <div id="questions-container" class="space-y-6"></div>
+
+                        <div id="preview-actions" class="mt-8 pt-6 border-t border-gray-200 flex flex-wrap justify-end gap-3 hidden">
+                             <button id="upload-community-btn" class="bg-yellow-100 text-yellow-800 font-bold py-3 px-6 rounded-lg hover:bg-yellow-200 transition duration-300 flex items-center justify-center" data-i18n="upload_btn">分享到題庫</button>
+                             <button id="download-btn" class="themed-button-primary font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center" data-i18n="download_quiz_btn">下載題庫檔案</button>
+                             <button id="reset-btn" class="bg-red-100 text-red-700 font-bold py-3 px-6 rounded-lg hover:bg-red-200 transition duration-300 flex items-center justify-center" data-i18n="reset_btn">重置</button>
+                        </div>
+                    </div>
+
+                    <!-- Library Content -->
+                    <div id="work-content-library" class="work-tab-content flex-col flex-grow hidden">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                            <select id="lib-domain-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
+                            <select id="lib-grade-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
+                            <select id="lib-publisher-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
+                            <select id="lib-issue-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
+                        </div>
+                        <div id="lib-quiz-list" class="flex-grow"></div>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="text-center mt-12 text-sm text-gray-500">
+                <p>
+                    <span id="version-btn" class="cursor-pointer hover:underline text-indigo-600 font-semibold" data-i18n="footer_version">v8.8 版本修正歷程</span> | 
+                    <span data-i18n="footer_powered_by">由 Google Gemini 強力驅動</span> | 
+
+                    <a href="https://bit.ly/Aliang" target="_blank" class="themed-accent-text themed-accent-text-hover">ㄚ亮笑長練功坊</a> | 
+                    <a href="readme.html" target="_blank" class="themed-accent-text themed-accent-text-hover" data-i18n="footer_intro">程式簡介與使用說明</a> |
+                    瀏覽人數: <span id="visitor-counter">---</span>
+                </p>
+            </footer>
+        </div>
+        
+        <div id="toast" class="fixed bottom-5 right-5 bg-green-500 text-white py-2 px-5 rounded-lg shadow-xl opacity-0 transition-opacity duration-300 z-50">
+            <p id="toast-message"></p>
+        </div>
+
+        <div id="version-modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 md:w-1/2 max-w-lg relative">
+                <h3 class="themed-heading text-2xl font-bold mb-4" data-i18n="version_history_title">版本修正歷程</h3>
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                <div id="version-history-content" class="space-y-4 max-h-80 overflow-y-auto pr-4"></div>
+            </div>
+        </div>
+        
+        <div id="post-download-modal" class="fixed inset-0 bg-gray-800 bg-opacity-70 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-11/12 max-w-md text-center transform transition-all scale-95 opacity-0" id="post-download-modal-content">
+                <h3 class="themed-heading text-2xl font-bold mb-4" data-i18n="modal_download_title">下載已開始！</h3>
+                <p class="text-gray-600 mb-8" data-i18n="modal_download_desc">您的題庫檔案已開始下載。接下來您想做什麼？</p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button id="continue-editing-btn" class="w-full bg-gray-200 text-gray-800 font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition duration-300" data-i18n="btn_continue_editing">繼續編輯</button>
+                    <button id="clear-and-new-btn" class="w-full themed-button-primary font-bold py-3 px-6 rounded-lg transition duration-300" data-i18n="btn_clear_new">清除並開始新任務</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="language-choice-modal" class="fixed inset-0 bg-gray-800 bg-opacity-70 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-11/12 max-w-md text-center transform transition-all scale-95 opacity-0" id="language-choice-modal-content">
+                <h3 class="themed-heading text-2xl font-bold mb-4" data-i18n="modal_lang_title">偵測到英文內容</h3>
+                <p class="text-gray-600 mb-8" data-i18n="modal_lang_desc">請問您希望用哪一種語言來生成題目？</p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button id="lang-choice-zh-btn" class="w-full bg-gray-200 text-gray-800 font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition duration-300" data-i18n="btn_chinese_quiz">中文出題</button>
+                    <button id="lang-choice-en-btn" class="w-full themed-button-primary font-bold py-3 px-6 rounded-lg transition duration-300" data-i18n="btn_english_quiz">英文出題</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="prompt-modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 md:w-2/3 max-w-3xl relative flex flex-col" style="max-height: 90vh;">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="themed-heading text-2xl font-bold" data-i18n="prompt_modal_title">預覽/修改提示詞</h3>
+                    <button id="close-prompt-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div class="flex-grow overflow-y-auto">
+                    <textarea id="prompt-display-area" class="w-full h-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors font-mono text-sm" style="min-height: 300px; resize: vertical;"></textarea>
+                </div>
+                <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                    <button id="copy-prompt-btn" class="w-full sm:w-auto bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition duration-300 flex items-center justify-center" data-i18n="btn_copy_prompt">複製提示詞</button>
+                    <button id="generate-with-edited-prompt-btn" class="w-full sm:flex-1 themed-button-primary font-bold py-2 px-4 rounded-lg transition duration-300" data-i18n="btn_use_prompt">使用此提示詞生成</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="share-modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-md relative">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="themed-heading text-2xl font-bold text-center flex-1" data-i18n="share_modal_title">請先閱讀</h3>
+                    <button id="close-share-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div id="qr-code-container" class="flex justify-center my-6"></div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700" data-i18n="share_link_label">分享連結：</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="share-link-input" readonly class="w-full flex-grow p-2 border rounded-md bg-gray-50 text-sm">
+                        <button id="copy-link-btn" class="bg-gray-100 p-2 rounded-lg text-sm" data-i18n="btn_copy">複製</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分享至公開題庫 Modal -->
+        <div id="upload-modal" class="fixed inset-0 bg-gray-800 bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-lg relative">
+                <h3 class="themed-heading text-2xl font-bold mb-4">分享至公開題庫</h3>
+                <button id="close-upload-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold focus:outline-none">&times;</button>
+                
+                <form id="upload-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">作者名稱 <span class="text-red-500">*</span></label>
+                        <input type="text" id="upload-author" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" required placeholder="例如：王老師">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">教學領域 <span class="text-red-500">*</span></label>
+                            <select id="upload-domain" class="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500" required>
+                                <!-- JS populate -->
+                            </select>
+                        </div>
+                        <div>
+                             <label class="block text-sm font-medium text-gray-700 mb-1">適用年級 <span class="text-red-500">*</span></label>
+                            <select id="upload-grade" class="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500" required>
+                                 <!-- JS populate -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">融入議題</label>
+                            <select id="upload-issue" class="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500">
+                                <!-- JS populate -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">版本 <span class="text-red-500">*</span></label>
+                            <select id="upload-publisher" class="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500" required>
+                                 <option value="">請選擇版本...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">單元名稱 <span class="text-red-500">*</span></label>
+                        <input type="text" id="upload-unit" class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" required placeholder="例如：光合作用">
+                    </div>
+                    
+                    <div class="pt-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" required class="form-checkbox text-indigo-600 rounded">
+                            <span class="ml-2 text-sm text-gray-600">我同意將此內容以 CC0 公眾領域條款分享給社群。</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="w-full themed-button-primary font-bold py-3 px-4 rounded-lg mt-4 shadow-md transition-transform active:scale-95">
+                        確認上傳
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Mobile FAB -->
+        <button id="mobile-fab" class="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-40">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+        </button>
+
+    </div> 
+    <script src="main.js" type="module"></script>
+</body>
+</html>
