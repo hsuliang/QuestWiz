@@ -1,3 +1,4 @@
+import { QUESTION_STYLE } from '../constants.js';
 import { CONFIG, contentLoadingMessages } from '../config.js';
 import * as ui from '../ui.js';
 import { getApiKey, fetchWithRetry } from '../api.js';
@@ -134,7 +135,7 @@ export async function callGeminiForContent(promptString) {
             if (elements.shareContentBtn) elements.shareContentBtn.classList.remove('hidden');
             if (elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
             if (elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = true;
-            if (elements.questionStyleSelect) elements.questionStyleSelect.value = 'competency-based';
+            if (elements.questionStyleSelect) elements.questionStyleSelect.value = QUESTION_STYLE.COMPETENCY_BASED;
             triggerOrUpdate();
         } else { 
             throw new Error(ui.t('error_generate_fail')); 
@@ -312,7 +313,7 @@ export async function handleExtractFromUrl() {
     ui.switchWorkTab('edit');
 
     const endpoint = isYouTube ? CONFIG.GET_YOUTUBE_TRANSCRIPT_URL : CONFIG.EXTRACT_URL_FUNCTION_URL;
-    const loaderText = isYouTube ? '正在擷取 YouTube 字幕...' : '正在擷取網頁內容...';
+    let loaderText = isYouTube ? '正在擷取 YouTube 字幕...' : '正在擷取網頁內容...';
     
     ui.showLoader(loaderText);
     try {
@@ -333,7 +334,60 @@ export async function handleExtractFromUrl() {
         if (isYouTube) {
             fullText = result.transcript;
         } else {
-            fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+            // 針對網頁內容，使用 Gemini 進行二次清洗
+            ui.showLoader("AI 正在智慧去雜訊與提取主文...");
+            
+            const rawContent = result.content; // 這裡是 Jina 回傳的 Markdown
+            const cleaningPrompt = `
+你是一位專業的內容編輯。請處理以下從網頁擷取的 Markdown 內容：
+
+**目標**：去除所有導覽列、側邊欄、廣告、頁尾、版權宣告以及「其他人也在看」、「熱門新聞」這類不相關的推薦連結列表。只保留**核心文章的標題**與**正文內容**。
+
+**輸入內容**：
+${rawContent.substring(0, 30000)} 
+(內容若過長已截斷)
+
+**輸出要求**：
+1. 直接回傳乾淨的文章標題與內文。
+2. 保持 Markdown 格式（如標題用 #, 段落用空行）。
+3. 不要包含任何解釋性文字（如「好的，這是結果...」）。
+4. 如果有多篇新聞混雜，只保留最核心、篇幅最長的那一篇。
+`;
+
+            const apiKey = getApiKey();
+            if (apiKey) {
+                try {
+                     const cleanResponse = await fetchWithRetry(`${CONFIG.BASE_URL}/models/${CONFIG.MODEL_NAME}:generateContent`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-goog-api-key': apiKey
+                        },
+                        body: JSON.stringify({
+                            "contents": [{ "parts": [{ "text": cleaningPrompt }] }]
+                        })
+                    });
+                    
+                    if (cleanResponse.ok) {
+                        const cleanResult = await cleanResponse.json();
+                        const cleanedText = cleanResult.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (cleanedText) {
+                            fullText = cleanedText.trim();
+                        } else {
+                            // 若 AI 清洗失敗，回退到原始內容
+                             fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+                        }
+                    } else {
+                         // 若 API 呼叫失敗，回退到原始內容
+                         fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+                    }
+                } catch (e) {
+                    console.warn("AI 清洗失敗，使用原始內容:", e);
+                    fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+                }
+            } else {
+                 fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+            }
         }
         
         if(elements.textInput) {
