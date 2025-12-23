@@ -1,54 +1,26 @@
-/**
- * 資料正規化與清洗模組
- * 負責確保進入 State 的題目資料結構一致且正確
- */
+import { BLOOM_LEVELS } from '../constants.js';
 
 /**
- * 正規化單一題目物件
- * @param {Object} q - 原始題目物件
- * @param {string} fallbackLevel - 預設的認知層次
- * @returns {Object} - 完美的題目物件
+ * 1. 驗證題目原始格式 (不修改資料，僅判斷是否合格)
  */
-export function normalizeQuestion(q, fallbackLevel = 'understand') {
-    // 1. 處理正確答案 (統一轉為 number[])
-    let normalizedCorrect = [];
-    if (Array.isArray(q.correct)) {
-        normalizedCorrect = q.correct.map(v => parseInt(v, 10)).filter(v => !isNaN(v));
-    } else if (q.hasOwnProperty('correct') && (typeof q.correct === 'number' || typeof q.correct === 'string')) {
-        normalizedCorrect = [parseInt(q.correct, 10)];
-    } else if (q.hasOwnProperty('is_correct')) {
-        // 容錯是非題格式：若 API 回傳 is_correct (true/false)
-        normalizedCorrect = [q.is_correct ? 0 : 1];
-    } else {
-        normalizedCorrect = [0]; // 最終保底
-    }
+export function validateQuestion(q) {
+    if (!q || typeof q !== 'object') return false;
+    const hasText = !!(q.text && String(q.text).trim());
+    const hasOptions = Array.isArray(q.options) && q.options.length >= 2;
+    return hasText && hasOptions;
+}
 
-    // 2. 處理選項 (確保是陣列且補滿 4 個)
-    let normalizedOptions = [];
-    if (q.hasOwnProperty('is_correct')) {
-        // 是非題固定選項
-        normalizedOptions = ['是', '否'];
-    } else {
-        // 選擇題邏輯
-        if (Array.isArray(q.options) && q.options.length > 0) {
-            normalizedOptions = q.options.map(opt => String(opt));
-        } else {
-            normalizedOptions = [];
-        }
-        
-        // 自動補齊不足的選項 (至少 4 個)
-        const defaultLabels = ['選項 A', '選項 B', '選項 C', '選項 D'];
-        while (normalizedOptions.length < 4) {
-            normalizedOptions.push(defaultLabels[normalizedOptions.length] || `選項 ${normalizedOptions.length + 1}`);
-        }
-    }
-
-    // 3. 組裝最終物件
+/**
+ * 2. 基礎資料清洗 (型別轉化與修剪)
+ */
+export function normalizeQuestion(q) {
     return {
-        text: String(q.text || '（題目內容缺失）').trim(),
-        options: normalizedOptions,
-        correct: normalizedCorrect,
-        bloomLevel: q.bloomLevel || fallbackLevel,
+        text: String(q.text || '').trim(),
+        options: Array.isArray(q.options) ? q.options.map(opt => String(opt).trim()) : [],
+        correct: Array.isArray(q.correct) 
+            ? q.correct.map(v => parseInt(v, 10)).filter(v => !isNaN(v)) 
+            : (q.hasOwnProperty('correct') ? [parseInt(q.correct, 10)] : []),
+        bloomLevel: q.bloomLevel || '',
         explanation: String(q.explanation || '').trim(),
         design_concept: String(q.design_concept || '').trim(),
         time: parseInt(q.time, 10) || 30
@@ -56,29 +28,36 @@ export function normalizeQuestion(q, fallbackLevel = 'understand') {
 }
 
 /**
- * 正規化題目陣列
- * @param {Array} questions - 原始題目陣列
- * @param {string} fallbackLevel - 預設的認知層次
- * @returns {Array} - 正規化後的題目陣列
+ * 3. 補全缺失欄位 (Fallbacks)
  */
-export function normalizeQuestions(questions, fallbackLevel) {
-    if (!Array.isArray(questions)) return [];
-    return questions.map(q => normalizeQuestion(q, fallbackLevel));
+export function applyFallbacks(q, fallbackLevel = BLOOM_LEVELS.UNDERSTAND) {
+    const result = { ...q };
+    
+    if (!result.text) result.text = '（題目內容缺失）';
+    
+    // 補齊選項 (至少 4 個)
+    const defaultLabels = ['選項 A', '選項 B', '選項 C', '選項 D'];
+    if (result.options.length < 4) {
+        while (result.options.length < 4) {
+            result.options.push(defaultLabels[result.options.length] || `選項 ${result.options.length + 1}`);
+        }
+    }
+
+    if (result.correct.length === 0) result.correct = [0];
+    if (!result.bloomLevel) result.bloomLevel = fallbackLevel;
+    
+    return result;
 }
 
 /**
- * 驗證題目是否基本合格 (用於決定是否觸發 Retry)
- * @param {Object} q 
- * @returns {boolean}
+ * 組合技：將原始資料轉為可用資料
  */
-export function isQuestionValid(q) {
-    // 基本要求：有題目文字、有至少兩個選項、有正確答案索引
-    return (
-        q.text && 
-        q.text !== '（題目內容缺失）' && 
-        Array.isArray(q.options) && 
-        q.options.length >= 2 && 
-        Array.isArray(q.correct) && 
-        q.correct.length > 0
-    );
+export function processQuestion(q, fallbackLevel) {
+    const cleaned = normalizeQuestion(q);
+    return applyFallbacks(cleaned, fallbackLevel);
+}
+
+export function normalizeQuestions(questions, fallbackLevel) {
+    if (!Array.isArray(questions)) return [];
+    return questions.map(q => processQuestion(q, fallbackLevel));
 }
