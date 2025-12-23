@@ -37,11 +37,26 @@ export function isEnglish(text) {
 }
 
 /**
- * 檢查「自動出題」設定是否啟用 (已棄用，恆回傳 false)
- * @returns {boolean}
+ * 統一錯誤處理器
+ * 負責日誌記錄與使用者通知
+ * @param {Error|string} error - 錯誤物件或訊息
+ * @param {string} context - 錯誤發生的上下文描述
+ * @param {Function} [uiNotifier] - 選用的 UI 通知函式 (如 ui.showToast)
  */
-export function isAutoGenerateEnabled() {
-    return false;
+export function handleError(error, context, uiNotifier) {
+    const message = error.message || error;
+    console.error(`[Error][${context}]`, error);
+    
+    if (uiNotifier) {
+        uiNotifier(message, 'error');
+    }
+}
+
+/**
+ * 檢查內容是否存在並切換按鈕狀態
+ */
+export function isAutoGenerateEnabled(text, images) {
+    return text.trim() !== '' || images.length > 0;
 }
 
 /**
