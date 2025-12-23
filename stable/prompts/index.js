@@ -1,3 +1,4 @@
+import { QUESTION_STYLE } from '../constants.js';
 import { CONTENT_ROLE } from './blocks/content_role.js';
 import { getContentRules } from './blocks/content_rules.js';
 import { getQuestionRole } from './blocks/question_role.js';
@@ -34,7 +35,7 @@ export function getQuestionSystemInstruction(count, type, difficulty, style, lan
     const rolePart = getQuestionRole(count, typeText, distributionText, difficulty, studentLevel, language).trim();
 
     // 2. 風格規則
-    const styleRules = style === 'competency-based' ? COMPETENCY_RULES : STANDARD_RULES;
+    const styleRules = style === QUESTION_STYLE.COMPETENCY_BASED ? COMPETENCY_RULES : STANDARD_RULES;
 
     // 3. 組合所有部分
     return [
