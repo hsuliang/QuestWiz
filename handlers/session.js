@@ -1,3 +1,4 @@
+import { QUESTION_STYLE } from '../constants.js';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import * as utils from '../utils.js';
@@ -18,7 +19,7 @@ export function saveInputDraft() {
         numQuestionsInput: elements.numQuestionsInput ? elements.numQuestionsInput.value : '5',
         questionTypeSelect: elements.questionTypeSelect ? elements.questionTypeSelect.value : 'multiple_choice',
         difficultySelect: elements.difficultySelect ? elements.difficultySelect.value : '中等',
-        questionStyleSelect: elements.questionStyleSelect ? elements.questionStyleSelect.value : 'knowledge-recall',
+        questionStyleSelect: elements.questionStyleSelect ? elements.questionStyleSelect.value : QUESTION_STYLE.KNOWLEDGE_RECALL,
         studentLevelSelect: elements.studentLevelSelect ? elements.studentLevelSelect.value : '1-2',
         competencyBasedCheckbox: elements.competencyBasedCheckbox ? elements.competencyBasedCheckbox.checked : false,
         formatSelect: elements.formatSelect ? elements.formatSelect.value : '',
@@ -87,7 +88,7 @@ export function restoreDraft() {
                 if(elements.numQuestionsInput) elements.numQuestionsInput.value = inputs.numQuestionsInput || '5';
                 if(elements.questionTypeSelect) elements.questionTypeSelect.value = inputs.questionTypeSelect || 'multiple_choice';
                 if(elements.difficultySelect) elements.difficultySelect.value = inputs.difficultySelect || '中等';
-                if(elements.questionStyleSelect) elements.questionStyleSelect.value = inputs.questionStyleSelect || 'knowledge-recall';
+                if(elements.questionStyleSelect) elements.questionStyleSelect.value = inputs.questionStyleSelect || QUESTION_STYLE.KNOWLEDGE_RECALL;
                 if(elements.studentLevelSelect) elements.studentLevelSelect.value = inputs.studentLevelSelect || '1-2';
                 if(elements.quizTitleInput) elements.quizTitleInput.value = inputs.quizTitleInput || '';
                 if(elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = inputs.competencyBasedCheckbox || false;
@@ -195,7 +196,7 @@ export function clearAllInputs() {
         elements.studentLevelSelect.value = '';
     }
 
-    if(elements.questionStyleSelect) elements.questionStyleSelect.value = 'knowledge-recall';
+    if(elements.questionStyleSelect) elements.questionStyleSelect.value = QUESTION_STYLE.KNOWLEDGE_RECALL;
     if(elements.formatSelect) elements.formatSelect.value = ''; 
 
     state.setGeneratedQuestions([]);

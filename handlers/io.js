@@ -164,24 +164,12 @@ export function handleImageFiles(newFiles) {
 }
 
 export async function exportFile() {
-    const rawQuestions = state.getGeneratedQuestions();
+    const questions = state.getGeneratedQuestions();
     const format = elements.formatSelect ? elements.formatSelect.value : '';
     if (!format) return ui.showToast(ui.t('toast_select_format'), 'error');
-    if (!rawQuestions || rawQuestions.length === 0) return ui.showToast(ui.t('toast_no_questions'), 'error');
+    if (!questions || questions.length === 0) return ui.showToast(ui.t('toast_no_questions'), 'error');
     
-    // --- [新增] 終極資料清洗：確保所有題目的格式正確 ---
-    const questions = rawQuestions.map(q => {
-        let correct = q.correct;
-        // 如果是數字或字串，轉成陣列
-        if (typeof correct === 'number' || typeof correct === 'string') {
-            correct = [parseInt(correct, 10)];
-        } else if (!Array.isArray(correct)) {
-            // 處理是非題 fallback
-            if (q.hasOwnProperty('is_correct')) correct = [q.is_correct ? 0 : 1];
-            else correct = [];
-        }
-        return { ...q, correct };
-    });
+    // --- [清理] 此處原本有冗長的資料正規化邏輯，現已統一由生成後直接處理完畢 ---
 
     const titleInput = elements.quizTitleInput ? elements.quizTitleInput.value.trim() : '';
     const title = titleInput || '測驗卷';
@@ -230,7 +218,7 @@ export async function exportFile() {
             `;
 
             questions.forEach((q, index) => {
-                const isTF = q.hasOwnProperty('is_correct');
+                const isTF = q.options && q.options.length === 2 && q.options[0] === '是' && q.options[1] === '否';
                 htmlContent += `
                     <div style="margin-bottom: 15px; page-break-inside: avoid;">
                         <div style="display: flex; align-items: baseline;">
@@ -293,7 +281,8 @@ export async function exportFile() {
             
             questions.forEach((q, index) => {
                 txtContent += `${index + 1}. ${q.text}\n`;
-                if (q.hasOwnProperty('is_correct')) { 
+                const isTF = q.options && q.options.length === 2 && q.options[0] === '是' && q.options[1] === '否';
+                if (isTF) { 
                     txtContent += `(  ) 是   (  ) 否\n`;
                 } else if (q.options) {
                     q.options.forEach((opt, i) => {
@@ -308,8 +297,9 @@ export async function exportFile() {
             txtContent += `\n\n--- 解答 ---\n`;
             questions.forEach((q, index) => {
                 let answer = '';
-                if (q.hasOwnProperty('is_correct')) {
-                    answer = q.is_correct ? '是' : '否';
+                const isTF = q.options && q.options.length === 2 && q.options[0] === '是' && q.options[1] === '否';
+                if (isTF && q.correct && q.correct.length > 0) {
+                    answer = q.correct[0] === 0 ? '是' : '否';
                 } else if (q.correct && q.correct.length > 0) {
                     answer = q.correct.map(i => String.fromCharCode(65 + i)).join(', ');
                 }
@@ -333,16 +323,16 @@ export async function exportFile() {
             if (!XLSX) {
                 throw new Error('XLSX library failed to load on window object.');
             }
-            const standardMCQs = questions.map(q => q.hasOwnProperty('is_correct') ? { text: q.text, options: ['是', '否'], correct: [q.is_correct ? 0 : 1], time: 30, explanation: q.explanation || '' } : q);
+            // Trusting that all questions are already MCQ formatted by normalizer
             switch (format) {
                 case 'wordwall': {
-                    data = standardMCQs.map(q => ({ '問題': q.text, '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '', '正確選項': q.correct.length > 0 ? (q.correct[0] + 1) : '' }));
+                    data = questions.map(q => ({ '問題': q.text, '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '', '正確選項': q.correct.length > 0 ? (q.correct[0] + 1) : '' }));
                     filename = `${safeTitle}_Wordwall.xlsx`; 
                     break;
                 }
                 case 'kahoot': {
                     const kahootData = [ ['Kahoot Quiz Template'], [], [], [], ['Question', 'Answer 1', 'Answer 2', 'Answer 3', 'Answer 4', 'Time limit (sec)', 'Correct answer(s)'] ];
-                    standardMCQs.forEach(q => { kahootData.push([ q.text, q.options[0] || '', q.options[1] || '', q.options[2] || '', q.options[3] || '', q.time || 30, q.correct.map(i => i + 1).join(',') ]); });
+                    questions.forEach(q => { kahootData.push([ q.text, q.options[0] || '', q.options[1] || '', q.options[2] || '', q.options[3] || '', q.time || 30, q.correct.map(i => i + 1).join(',') ]); });
                     const ws = XLSX.utils.aoa_to_sheet(kahootData); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
                     XLSX.writeFile(wb, `${safeTitle}_Kahoot.xlsx`);
                     success = true;
@@ -351,7 +341,7 @@ export async function exportFile() {
                 case 'blooket': {
                     let csvContentBlooket = '"Blooket\nImport Template",,,,,,,';
                     csvContentBlooket += '\nQuestion #,Question Text,Answer 1,Answer 2,"Answer 3\n(Optional)","Answer 4\n(Optional)","Time Limit (sec)\n(Max: 300 seconds)","Correct Answer(s)\n(Only include Answer #)"';
-                    standardMCQs.forEach((q, index) => {
+                    questions.forEach((q, index) => {
                         const opts = [...(q.options || [])];
                         while(opts.length < 4) opts.push('');
                         const correctIndices = (q.correct || []).map(i => i + 1).join(','); 
@@ -381,7 +371,7 @@ export async function exportFile() {
                 case 'gimkit': {
                     let csvContentGimkit = 'Gimkit Spreadsheet Import Template,,,,';
                     csvContentGimkit += '\nQuestion,Correct Answer,Incorrect Answer 1,Incorrect Answer 2 (Optional),Incorrect Answer 3 (Optional)';
-                    standardMCQs.forEach(q => {
+                    questions.forEach(q => {
                         const correctIndex = (q.correct && q.correct.length > 0) ? q.correct[0] : -1;
                         let correctAnswerText = '';
                         let incorrectAnswers = [];
@@ -415,14 +405,14 @@ export async function exportFile() {
                     break;
                 }
                 case 'wayground': {
-                    data = standardMCQs.map(q => ({
+                    data = questions.map(q => ({
                         'Question Text': q.text, 'Question Type': (q.correct || []).length > 1 ? 'Checkbox' : 'Multiple Choice', 'Option 1': q.options[0] || '', 'Option 2': q.options[1] || '', 'Option 3': q.options[2] || '', 'Option 4': q.options[3] || '', 'Option 5': '', 'Correct Answer': (q.correct || []).map(i => i + 1).join(','), 'Time in seconds': q.time || 30, 'Image Link': '', 'Answer explanation': q.explanation || ''
                     }));
                     filename = `${safeTitle}_Wayground.xlsx`;
                     break;
                 }
                 case 'loilonote': {
-                    data = standardMCQs.map(q => ({
+                    data = questions.map(q => ({
                         '問題（請勿編輯標題）': q.text, '務必作答（若此問題需要回答，請輸入1）': 1, '每題得分（未填入的部分將被自動設為1）': 1, '正確答案的選項（若有複數正確答案選項，請用「、」或「 , 」來分隔選項編號）': (q.correct || []).map(i => i + 1).join(','), '說明': q.explanation || '', '選項1': q.options[0] || '', '選項2': q.options[1] || '', '選項3': q.options[2] || '', '選項4': q.options[3] || '',
                     }));
                     filename = `${safeTitle}_LoiLoNote.xlsx`;
