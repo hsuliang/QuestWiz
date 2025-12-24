@@ -23,16 +23,15 @@ export function applyFallbacks(q, fallbackLevel = BLOOM_LEVELS.UNDERSTAND) {
     const result = { ...q };
     if (!result.text) result.text = '（題目內容缺失）';
     
-    // 擴充是非題關鍵字，包含全形與半形的 O 與 X
     const tfKeywords = ['是', '否', '正確', '錯誤', 'True', 'False', 'Ｏ', 'Ｘ', 'O', 'X'];
     const isTrueFalse = 
         result.options.some(opt => tfKeywords.includes(opt)) || 
         (result.options.length === 2);
 
     if (isTrueFalse) {
-        if (result.options.length < 2) {
-            result.options = ['是', '否'];
-        }
+        // 統一強制轉化為全形 Ｏ, Ｘ
+        // 這樣不論 AI 給的是 '是/否' 還是 'O/X'，畫面上一律顯示全形 Ｏ/Ｘ
+        result.options = ['Ｏ', 'Ｘ'];
     } else {
         const defaultLabels = ['選項 A', '選項 B', '選項 C', '選項 D'];
         if (result.options.length < 4) {
