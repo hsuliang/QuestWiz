@@ -239,7 +239,7 @@ export function populateVersionHistory() {
     if (elements.versionBtn) elements.versionBtn.textContent = 'v8.9.1 版本修正歷程';
     const history = [
         { 
-            version: "v9.0 (2025/12/23)", 
+            version: "v9.0 (2025/12/24)", 
             current: true, 
             notes: [
                 "🎨 視覺一致性優化：完成全系統按鈕圖示化，並統一各類彈窗的操作介面。",
