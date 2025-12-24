@@ -117,7 +117,7 @@ export const translations = {
         "regenerate_btn": "重新生成",
         "download_quiz_btn": "下載題庫檔案",
         "reset_btn": "重置",
-        "footer_version": "v8.9 版本修正歷程",
+        "footer_version": "v9.0 版本修正歷程",
         "footer_powered_by": "由 Google Gemini 強力驅動",
         "footer_intro": "程式簡介與使用說明",
         "language_label": "介面語言選擇：",

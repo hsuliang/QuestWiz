@@ -236,11 +236,20 @@ export function applyThemePreference() {
 export function populateVersionHistory() {
     const versionHistoryContent = document.getElementById('version-history-content');
     if (!versionHistoryContent) return;
-    if (elements.versionBtn) elements.versionBtn.textContent = 'v8.9 版本修正歷程';
+    if (elements.versionBtn) elements.versionBtn.textContent = 'v8.9.1 版本修正歷程';
     const history = [
         { 
-            version: "v8.9 (2025/12/23)", 
+            version: "v9.0 (2025/12/23)", 
             current: true, 
+            notes: [
+                "🎨 視覺一致性優化：完成全系統按鈕圖示化，並統一各類彈窗的操作介面。",
+                "🧹 介面邏輯簡化：調整按鈕佈局與文字間距，消除視覺壓迫感。",
+                "🐞 Bug 修正：修復是非題選項顯示不一與解析錯誤之問題。"
+            ] 
+        },
+        { 
+            version: "v8.9 (2025/12/23)", 
+            current: false, 
             notes: [
                 "✨ 核心架構模組化：完成 View 層獨立與常數中心化，大幅提升維護性。",
                 "🛡️ 異步穩定性強化：導入任務追蹤與 ID 驗證，杜絕重複點擊與幽靈請求。",
