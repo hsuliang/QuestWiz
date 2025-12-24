@@ -2,9 +2,7 @@ import { BLOOM_LEVELS } from '../constants.js';
 
 export function validateQuestion(q) {
     if (!q || typeof q !== 'object') return false;
-    const hasText = !!(q.text && String(q.text).trim());
-    const hasOptions = Array.isArray(q.options) && q.options.length >= 2;
-    return hasText && hasOptions;
+    return !!(q.text && String(q.text).trim());
 }
 
 export function normalizeQuestion(q) {
@@ -25,11 +23,22 @@ export function applyFallbacks(q, fallbackLevel = BLOOM_LEVELS.UNDERSTAND) {
     const result = { ...q };
     if (!result.text) result.text = '（題目內容缺失）';
     
-    // 修正：只有在選項數不是 2 (是非題) 且小於 4 時才補齊
-    if (result.options.length !== 2 && result.options.length < 4) {
+    // 擴充是非題關鍵字，包含全形與半形的 O 與 X
+    const tfKeywords = ['是', '否', '正確', '錯誤', 'True', 'False', 'Ｏ', 'Ｘ', 'O', 'X'];
+    const isTrueFalse = 
+        result.options.some(opt => tfKeywords.includes(opt)) || 
+        (result.options.length === 2);
+
+    if (isTrueFalse) {
+        if (result.options.length < 2) {
+            result.options = ['是', '否'];
+        }
+    } else {
         const defaultLabels = ['選項 A', '選項 B', '選項 C', '選項 D'];
-        while (result.options.length < 4) {
-            result.options.push(defaultLabels[result.options.length] || `選項 ${result.options.length + 1}`);
+        if (result.options.length < 4) {
+            while (result.options.length < 4) {
+                result.options.push(defaultLabels[result.options.length] || `選項 ${result.options.length + 1}`);
+            }
         }
     }
 
