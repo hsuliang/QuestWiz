@@ -154,3 +154,26 @@ label.theme-chooser[for="theme-burgundy-red"] { background-color: #fce7f3; borde
     bottom: auto !important;
     right: auto !important;
 }
+/* 統一按鈕與圖示對齊樣式 */
+button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button svg {
+    flex-shrink: 0;
+}
+
+#clear-content-btn {
+    transition: all 0.2s ease;
+}
+
+#clear-content-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
+}
+
+#clear-content-btn:active {
+    transform: translateY(0);
+}

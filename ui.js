@@ -169,13 +169,21 @@ export function updateRegenerateButtonState() {
     if (!elements.regenerateBtn) return;
     const hasContent = (elements.textInput && elements.textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
     const hasQuestions = state.getGeneratedQuestions().length > 0;
+    
     const refreshIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10 10a1 1 0 01-1 1H5a1 1 0 110-2h5.001a5.002 5.002 0 004.087-7.885 1 1 0 111.732-1.001A7.002 7.002 0 0114 12z" clip-rule="evenodd" /></svg>`;
     const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
+    
     const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
     const tDict = translations[currentLang];
-    if (hasQuestions) elements.regenerateBtn.innerHTML = refreshIcon + (tDict ? tDict.regenerate_btn : '重新生成');
-    else elements.regenerateBtn.innerHTML = playIcon + (tDict ? tDict.generate_btn : '開始出題');
+    
+    if (hasQuestions) {
+        elements.regenerateBtn.innerHTML = refreshIcon + `<span>${tDict ? tDict.regenerate_btn : '重新生成'}</span>`;
+    } else {
+        elements.regenerateBtn.innerHTML = playIcon + `<span>${tDict ? tDict.generate_btn : '開始出題'}</span>`;
+    }
+    
     elements.regenerateBtn.classList.toggle('hidden', !hasContent);
+    elements.regenerateBtn.classList.add('themed-button-primary');
     const previewActions = document.getElementById('preview-actions');
     if (previewActions) previewActions.classList.toggle('hidden', state.getGeneratedQuestions().length === 0);
 }
