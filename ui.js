@@ -6,6 +6,7 @@ import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js';
 import { TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js';
 import { translations } from './translations.js';
+import { refreshUI } from './view/sync.js';
 
 // Import View Layer
 import * as view from './view/index.js';
@@ -32,85 +33,20 @@ export function t(key) {
     return (translations[lang] && translations[lang][key]) ? translations[lang][key] : key;
 }
 
-/**
- * [New] 統一事件委派中心 (Event Delegation)
- * 負責處理題目列表內的所有互動
- */
-export function setupQuestionListEvents() {
-    const container = document.getElementById('questions-container');
-    if (!container || container.dataset.eventsBound) return;
-
-    container.addEventListener('input', (e) => {
-        const target = e.target;
-        const card = target.closest('.question-card');
-        if (!card) return;
-        const index = parseInt(card.dataset.index, 10);
-        const action = target.dataset.action;
-
-        if (action === 'update-text') {
-            EditorHandlers.updateQuestionField(index, 'text', target.value);
-        } else if (action === 'update-option') {
-            const optIndex = parseInt(target.dataset.optIndex, 10);
-            EditorHandlers.updateOption(index, optIndex, target.value);
-        }
-    });
-
-    container.addEventListener('change', (e) => {
-        const target = e.target;
-        const card = target.closest('.question-card');
-        if (!card) return;
-        const index = parseInt(card.dataset.index, 10);
-        const action = target.dataset.action;
-
-        if (action === 'update-correct' && target.checked) {
-            EditorHandlers.updateCorrectAnswer(index, [parseInt(target.value, 10)]);
-        }
-    });
-
-    container.addEventListener('click', (e) => {
-        const target = e.target.closest('[data-action]');
-        if (!target) return;
-        const card = target.closest('.question-card');
-        if (!card) return;
-        const index = parseInt(card.dataset.index, 10);
-        const action = target.dataset.action;
-
-        if (action === 'delete') {
-            EditorHandlers.deleteQuestion(index);
-            renderQuestionsForEditing(state.getGeneratedQuestions());
-            initializeSortable();
-        } else if (action === 'copy') {
-            EditorHandlers.copyQuestion(index);
-            renderQuestionsForEditing(state.getGeneratedQuestions());
-            initializeSortable();
-            showToast(t('toast_copy_success'), 'success');
-        }
-    });
-
-    container.dataset.eventsBound = "true";
-    console.log('[UI] Question list event delegation initialized.');
-}
-
 export function populateDropdowns() {
     const gradeOptions = [
         { value: "全部", text: "所有年級" },
         ...Array.from({ length: 12 }, (_, i) => ({ value: i + 1, text: `${i + 1} 年級` }))
     ];
-    const populate = (selectElement, options, defaultOption) => {
-        if (!selectElement) return;
-        selectElement.innerHTML = '';
-        if (defaultOption) {
-            const opt = document.createElement('option');
-            opt.value = defaultOption.value;
-            opt.textContent = defaultOption.text;
-            selectElement.appendChild(opt);
-        }
-        options.forEach(item => {
-            const opt = document.createElement('option');
-            const isObj = typeof item === 'object';
-            opt.value = isObj ? item.value : item;
-            opt.textContent = isObj ? item.text : item;
-            selectElement.appendChild(opt);
+    const populate = (el, opts, def) => {
+        if (!el) return;
+        el.innerHTML = '';
+        if (def) { const o = document.createElement('option'); o.value = def.value; o.textContent = def.text; el.appendChild(o); }
+        opts.forEach(item => {
+            const o = document.createElement('option');
+            o.value = typeof item === 'object' ? item.value : item;
+            o.textContent = typeof item === 'object' ? item.text : item;
+            el.appendChild(o);
         });
     };
     populate(elements.uploadDomain, TAIWAN_EDU_DOMAINS, { value: "", text: "請選擇領域..." });
@@ -125,12 +61,24 @@ export function populateDropdowns() {
 }
 
 /**
- * 渲染題目編輯區 (簡化版，不再傳遞 Callback)
+ * 渲染題目編輯區 (穩定版：直接綁定 Callback)
  */
 export function renderQuestionsForEditing(questions) {
-    view.renderQuestionsForEditing(questions);
-    // 確保事件委派已綁定 (只需綁定一次)
-    setupQuestionListEvents();
+    view.renderQuestionsForEditing(questions, {
+        onUpdateField: (index, field, value) => EditorHandlers.updateQuestionField(index, field, value),
+        onUpdateOption: (index, optIndex, value) => EditorHandlers.updateOption(index, optIndex, value),
+        onUpdateCorrect: (index, correctArr) => EditorHandlers.updateCorrectAnswer(index, correctArr),
+        onDelete: (index) => {
+            EditorHandlers.deleteQuestion(index);
+            renderQuestionsForEditing(state.getGeneratedQuestions());
+        },
+        onCopy: (index) => {
+            EditorHandlers.copyQuestion(index);
+            renderQuestionsForEditing(state.getGeneratedQuestions());
+            showToast(t('toast_copy_success'), 'success');
+        }
+    });
+    initializeSortable(); // 重點：重新渲染後必須重啟拖曳
 }
 
 export function renderLibraryQuizzes(quizzes, onImport, onDelete) {
@@ -138,54 +86,30 @@ export function renderLibraryQuizzes(quizzes, onImport, onDelete) {
 }
 
 export function stopKeyTimer() {
-    const timerDisplay = document.getElementById('api-key-timer');
+    const display = document.getElementById('api-key-timer');
     clearInterval(state.getKeyTimerInterval());
-    if (timerDisplay) timerDisplay.style.display = 'none';
+    if (display) display.style.display = 'none';
 }
 
 export function startKeyTimer(expirationTime) {
-    const timerDisplay = document.getElementById('api-key-timer');
-    if (!timerDisplay) return;
+    const display = document.getElementById('api-key-timer');
+    if (!display) return;
     clearInterval(state.getKeyTimerInterval());
-    timerDisplay.style.display = 'inline';
-    const updateTimer = () => {
-        const remaining = expirationTime - new Date().getTime();
-        if (remaining <= 0) {
-            timerDisplay.textContent = '金鑰已過期';
-            stopKeyTimer();
-            getApiKey();
-            return;
-        }
-        const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24).toString().padStart(2, '0');
-        const minutes = Math.floor((remaining / 1000 / 60) % 60).toString().padStart(2, '0');
-        const seconds = Math.floor((remaining / 1000) % 60).toString().padStart(2, '0');
-        timerDisplay.textContent = `(有效時間 ${hours}:${minutes}:${seconds})`;
+    display.style.display = 'inline';
+    const update = () => {
+        const rem = expirationTime - Date.now();
+        if (rem <= 0) { display.textContent = '金鑰已過期'; stopKeyTimer(); getApiKey(); return; }
+        const h = Math.floor((rem / 3600000) % 24).toString().padStart(2, '0');
+        const m = Math.floor((rem / 60000) % 60).toString().padStart(2, '0');
+        const s = Math.floor((rem / 1000) % 60).toString().padStart(2, '0');
+        display.textContent = `(有效時間 ${h}:${m}:${s})`;
     };
-    updateTimer();
-    state.setKeyTimerInterval(setInterval(updateTimer, 1000));
+    update();
+    state.setKeyTimerInterval(setInterval(update, 1000));
 }
 
 export function updateRegenerateButtonState() {
-    if (!elements.regenerateBtn) return;
-    const hasContent = (elements.textInput && elements.textInput.value.trim() !== '') || state.getUploadedImages().length > 0;
-    const hasQuestions = state.getGeneratedQuestions().length > 0;
-    
-    const refreshIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10 10a1 1 0 01-1 1H5a1 1 0 110-2h5.001a5.002 5.002 0 004.087-7.885 1 1 0 111.732-1.001A7.002 7.002 0 0114 12z" clip-rule="evenodd" /></svg>`;
-    const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
-    
-    const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
-    const tDict = translations[currentLang];
-    
-    if (hasQuestions) {
-        elements.regenerateBtn.innerHTML = refreshIcon + `<span>${tDict ? tDict.regenerate_btn : '重新生成'}</span>`;
-    } else {
-        elements.regenerateBtn.innerHTML = playIcon + `<span>${tDict ? tDict.generate_btn : '開始出題'}</span>`;
-    }
-    
-    elements.regenerateBtn.classList.toggle('hidden', !hasContent);
-    elements.regenerateBtn.classList.add('themed-button-primary');
-    const previewActions = document.getElementById('preview-actions');
-    if (previewActions) previewActions.classList.toggle('hidden', state.getGeneratedQuestions().length === 0);
+    refreshUI();
 }
 
 export function initializeSortable() {
@@ -197,115 +121,100 @@ export function initializeSortable() {
         onEnd: function (evt) {
             state.updateGeneratedQuestions(prev => {
                 const questions = [...prev];
-                const [movedItem] = questions.splice(evt.oldIndex, 1); 
-                questions.splice(evt.newIndex, 0, movedItem);
+                const [moved] = questions.splice(evt.oldIndex, 1); 
+                questions.splice(evt.newIndex, 0, moved);
                 return questions;
             });
+            // 拖曳完畢後重新渲染以更新題號
             renderQuestionsForEditing(state.getGeneratedQuestions());
-            initializeSortable();
         }, 
     });
     state.setSortableInstance(newSortable);
 }
 
-export function setupDragDrop(dropZone, fileHandler, isMultiple) {
-    if (!dropZone) return;
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
-    ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('drag-over'), false));
-    ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('drag-over'), false));
-    dropZone.addEventListener('drop', e => { if (isMultiple) fileHandler(e.dataTransfer.files); else fileHandler(e.dataTransfer.files[0]); }, false);
+export function setupDragDrop(zone, handler, isMultiple) {
+    if (!zone) return;
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false));
+    ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, () => zone.classList.add('drag-over'), false));
+    ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, () => zone.classList.remove('drag-over'), false));
+    zone.addEventListener('drop', e => { if (isMultiple) handler(e.dataTransfer.files); else handler(e.dataTransfer.files[0]); }, false);
 }
 
 export function applyLayoutPreference() {
-    const preferredLayout = localStorage.getItem('quizGenLayout_v2');
+    const layout = localStorage.getItem('quizGenLayout_v2');
     if (!elements.mainContainer) return;
-    const placeholderP = elements.previewPlaceholder;
-    const currentLang = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
-    const tDict = translations[currentLang];
-    const isReversed = preferredLayout === 'reversed';
-    elements.mainContainer.classList.toggle('lg:flex-row-reverse', isReversed);
-    if (placeholderP && tDict) placeholderP.textContent = isReversed ? tDict.preview_placeholder_reversed : tDict.preview_placeholder;
+    const tDict = translations[localStorage.getItem('quizGenLanguage_v1') || 'zh-TW'];
+    const isRev = layout === 'reversed';
+    elements.mainContainer.classList.toggle('lg:flex-row-reverse', isRev);
+    if (elements.previewPlaceholder && tDict) elements.previewPlaceholder.textContent = isRev ? tDict.preview_placeholder_reversed : tDict.preview_placeholder;
 }
 
 export function applyThemePreference() {
-    const savedTheme = localStorage.getItem('quizGenTheme_v1') || 'lavender';
-    const radio = document.getElementById(`theme-${savedTheme}`);
+    const theme = localStorage.getItem('quizGenTheme_v1') || 'lavender';
+    const radio = document.getElementById(`theme-${theme}`);
     if (radio) radio.checked = true;
 }
 
 export function populateVersionHistory() {
-    const versionHistoryContent = document.getElementById('version-history-content');
-    if (!versionHistoryContent) return;
-    if (elements.versionBtn) elements.versionBtn.textContent = 'v8.9.1 版本修正歷程';
+    const content = document.getElementById('version-history-content');
+    if (!content) return;
+    if (elements.versionBtn) elements.versionBtn.textContent = 'v9.5 版本修正歷程';
     const history = [
-        { 
-            version: "v9.0 (2025/12/24)", 
-            current: true, 
-            notes: [
-                "🎨 視覺一致性優化：完成全系統按鈕圖示化，並統一各類彈窗的操作介面。",
-                "🧹 介面邏輯簡化：調整按鈕佈局與文字間距，消除視覺壓迫感。",
-                "🐞 Bug 修正：修復是非題選項顯示不一與解析錯誤之問題。"
-            ] 
-        },
-        { 
-            version: "v8.9 (2025/12/23)", 
-            current: false, 
-            notes: [
-                "✨ 核心架構模組化：完成 View 層獨立與常數中心化，大幅提升維護性。",
-                "🛡️ 異步穩定性強化：導入任務追蹤與 ID 驗證，杜絕重複點擊與幽靈請求。",
-                "🚀 操作效能優化：實作事件委派與動態 DOM 存取，提升介面流暢度。",
-                "📡 API 請求韌性：加入智慧重試與安全性捕捉，提升 AI 出題成功率。",
-                "🌐 網址抓取進化：整合 Jina 與本地雙解析策略，並模擬真實瀏覽器環境。",
-                "📦 品質工程保障：建立自動化驗收腳本，確保系統釋出穩定。"
-            ] 
-        },
-        { 
-            version: "v8.8 (2025/12/22)", 
-            current: false, 
-            notes: ["【✨ 認知領域進階】 - 新增布魯姆認知層次分配。", "【🚀 穩定性提升】 - 恢復穩定 API 邏輯。", "【📝 命題規範】 - 整合核心命題指南。"] 
-        }
+        { version: "v9.5 (2025/12/28)", current: true, notes: ["✨ 互動標記：選取文章文字即可快速設為考點，並自動高亮顯示。", "🎨 智慧高亮：輸入框支援即時關鍵字變色，且與捲動完美同步。", "🛠️ 系統修復：解決出題卡頓問題，優化渲染邏輯。"] },
+        { version: "v9.4 (2025/12/27)", current: false, notes: ["🚀 效能巔峰：實作「智慧局部更新」，編輯題目時游標不再跳離，體感極度流暢。", "🛡️ 穩定性強：修復 PDF 中文擷取 bcmap 錯誤，改用穩定 CDN。", "🎨 互動細緻：新增 AI 生成與分析時的按鈕內 Loading 動態。"] },
+        { version: "v9.3 (2025/12/27)", current: false, notes: ["🧩 組件化革命：導入 HTML &lt;template&gt; 技術，徹底分離視圖與邏輯，解決按鈕失效問題。"] },
+        { version: "v9.2 (2025/12/27)", current: false, notes: ["⚡ 響應式核心：重構資料層 (MVVM)，實現「修改資料、自動繪圖」的自動檔體驗。"] },
+        { version: "v9.0 (2025/12/23)", current: false, notes: ["🎨 視覺一致性優化：全系統按鈕圖示化。", "🛡️ 異步穩定性：導入任務追蹤與 ID 驗證。"] }
     ];
-    versionHistoryContent.innerHTML = history.map(v => `<div><h4 class="font-bold text-lg">${v.version} ${v.current ? '<span class="text-sm font-normal themed-accent-text">(目前版本)</span>' : ''}</h4><ul class="list-disc list-inside text-gray-600">${v.notes.map(n => `<li>${n}</li>`).join('')}</ul></div>`).join('');
+    content.innerHTML = history.map(v => `
+        <div class="mb-6 last:mb-0">
+            <h4 class="font-bold text-lg ${v.current ? 'themed-accent-text' : 'text-gray-700'} flex items-center">
+                ${v.version} 
+                ${v.current ? '<span class="text-[10px] font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full ml-2 uppercase tracking-wider">Latest</span>' : ''}
+            </h4>
+            <ul class="mt-3 space-y-2">
+                ${v.notes.map(n => `
+                    <li class="flex items-start text-sm text-gray-600 leading-relaxed">
+                        <span class="text-indigo-400 mr-2 flex-shrink-0 mt-0.5">✦</span>
+                        <span>${n}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    `).join('<hr class="my-4 border-gray-100">');
 }
 
 export async function updateVisitorCount() {
-    const counterElement = document.getElementById('visitor-counter');
-    if (!counterElement) return;
+    const el = document.getElementById('visitor-counter');
+    if (!el) return;
     try {
-        const response = await fetch(`https://api.counterapi.dev/v1/aliang-quiz-gen/main/up`);
-        const data = await response.json();
-        if (data.count) counterElement.textContent = data.count.toLocaleString();
-    } catch (e) { console.error('無法載入瀏覽人數:', e); }
+        const res = await fetch(`https://api.counterapi.dev/v1/aliang-quiz-gen/main/up`);
+        const data = await res.json();
+        if (data.count) el.textContent = data.count.toLocaleString();
+    } catch (e) {}
 }
 
 export function askForLanguageChoice() {
     return new Promise((resolve, reject) => {
         const modal = document.getElementById('language-choice-modal');
-        const content = document.getElementById('language-choice-modal-content');
-        const zhBtn = document.getElementById('lang-choice-zh-btn');
-        const enBtn = document.getElementById('lang-choice-en-btn');
-        if (!modal || !content) return reject('Modal not found');
+        const zh = document.getElementById('lang-choice-zh-btn');
+        const en = document.getElementById('lang-choice-en-btn');
+        if (!modal) return reject();
         modal.classList.remove('hidden');
-        setTimeout(() => content.classList.add('open'), 10);
-        const handle = (choice) => {
-            content.classList.remove('open');
-            setTimeout(() => { modal.classList.add('hidden'); resolve(choice); }, 200);
-        };
-        zhBtn.onclick = () => handle('chinese');
-        enBtn.onclick = () => handle('english');
+        zh.onclick = () => { modal.classList.add('hidden'); resolve('chinese'); };
+        en.onclick = () => { modal.classList.add('hidden'); resolve('english'); };
     });
 }
 
 export function updateLanguage(lang) {
     if (!translations[lang]) return;
-    document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (translations[lang][k]) el.textContent = translations[lang][k]; });
-    document.querySelectorAll('[data-i18n-html]').forEach(el => { const k = el.getAttribute('data-i18n-html'); if (translations[lang][k]) el.innerHTML = translations[lang][k]; });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const k = el.getAttribute('data-i18n-placeholder'); if (translations[lang][k]) el.placeholder = translations[lang][k]; });
-    updateRegenerateButtonState(); 
-    if (elements.previewPlaceholder) {
-        const isRev = document.getElementById('main-container').classList.contains('lg:flex-row-reverse');
-        elements.previewPlaceholder.textContent = translations[lang][isRev ? 'preview_placeholder_reversed' : 'preview_placeholder'];
-    }
+    document.querySelectorAll('[data-i18n]').forEach(el => { 
+        const k = el.getAttribute('data-i18n'); 
+        if (translations[lang][k]) {
+            el.textContent = translations[lang][k];
+        }
+    });
+    refreshUI();
     document.documentElement.lang = lang;
     localStorage.setItem('quizGenLanguage_v1', lang);
     document.querySelectorAll('input[name="language"]').forEach(r => { r.checked = (r.value === lang); });
@@ -320,23 +229,13 @@ export function initLanguage() {
 export function applyImportedData(quiz) {
     const { settings, sourceContext, unit, title } = quiz;
     if (settings) {
-        if (elements.formatSelect) elements.formatSelect.value = settings.format || '';
         if (elements.studentLevelSelect) elements.studentLevelSelect.value = settings.studentLevel || '';
-        if (elements.difficultySelect) elements.difficultySelect.value = settings.difficulty || '中等';
-        if (elements.questionTypeSelect) elements.questionTypeSelect.value = settings.questionType || 'multiple_choice';
         if (elements.questionStyleSelect) elements.questionStyleSelect.value = settings.questionStyle || QUESTION_STYLE.KNOWLEDGE_RECALL;
         if (elements.numQuestionsInput) elements.numQuestionsInput.value = settings.numQuestions || '5';
     }
     if (sourceContext && sourceContext.content) {
-        elements.textInput.value = '';
-        elements.urlInput.value = '';
-        if (sourceContext.sourceType === 'url') {
-            elements.urlInput.value = sourceContext.content;
-            if (elements.tabs.input.buttons[2]) elements.tabs.input.buttons[2].click();
-        } else {
-            elements.textInput.value = sourceContext.content;
-            if (elements.tabs.input.buttons[0]) elements.tabs.input.buttons[0].click();
-        }
+        elements.textInput.value = sourceContext.content;
+        elements.textInput.dispatchEvent(new Event('input'));
     }
     if (elements.quizTitleInput) elements.quizTitleInput.value = unit || title;
 }

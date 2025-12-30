@@ -42,10 +42,17 @@ export const elements = {
     get extractFromUrlBtn() { return document.getElementById('extract-from-url-btn'); },
     get editPromptBtn() { return document.getElementById('edit-prompt-btn'); },
 
+    // [New] Phase 1: 內容分析與標記
+    get analyzeContentBtn() { return document.getElementById('analyze-content-btn'); },
+    get reAnalyzeBtn() { return document.getElementById('re-analyze-btn'); },
+    get keywordAnalysisArea() { return document.getElementById('keyword-analysis-area'); },
+    get keywordContainer() { return document.getElementById('keyword-container'); },
+    get customKeywordInput() { return document.getElementById("custom-keyword-input"); },
+    get addCustomKeywordBtn() { return document.getElementById("add-custom-keyword-btn"); },
+
     // 題目生成設定 (Quiz Settings)
     get quizTitleInput() { return document.getElementById('quiz-title-input'); },
     get studentLevelSelect() { return document.getElementById('student-level-select-quiz'); },
-    get studentLevelSelects() { return document.querySelectorAll('.student-level-sync'); },
     get numQuestionsInput() { return document.getElementById('num-questions'); },
     get formatSelect() { return document.getElementById('format-select'); },
     get questionTypeSelect() { return document.getElementById('question-type-select'); },
@@ -83,9 +90,9 @@ export const elements = {
     // 彈出視窗 (Modals)
     get versionBtn() { return document.getElementById('version-btn'); },
     get versionModal() { return document.getElementById('version-modal'); },
-    get closeModalBtn() { return document.getElementById('close-modal-btn'); },
+    get closeModalBtn() { return document.getElementById('close-version-modal-btn'); },
     get uploadModal() { return document.getElementById('upload-modal'); },
-    get uploadForm() { return document.getElementById('upload-form'); },
+    get uploadForm() { return document.getElementById("upload-form"); },
     get uploadUnit() { return document.getElementById('upload-unit'); },
     get uploadAuthor() { return document.getElementById('upload-author'); },
     get uploadGrade() { return document.getElementById('upload-grade'); },
@@ -108,7 +115,7 @@ export const elements = {
     get shareLinkInput() { return document.getElementById('share-link-input'); },
     get copyLinkBtn() { return document.getElementById('copy-link-btn'); },
 
-    // Tabs 系統 (因為是多元素組合，改用 Getter Function)
+    // Tabs 系統
     get tabs() {
         return {
             settings: {

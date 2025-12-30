@@ -174,6 +174,85 @@ button svg {
     box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
 }
 
-#clear-content-btn:active {
-    transform: translateY(0);
+/* --- TEXTAREA HIGHLIGHTING SYSTEM --- */
+.textarea-wrapper textarea,
+#text-input-backdrop {
+    font-family: 'Noto Sans TC', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    padding: 1rem;
+    margin: 0;
+    box-sizing: border-box;
+    width: 100%;
+    letter-spacing: normal;
+    word-spacing: normal;
+    overflow-y: scroll; /* 強制顯示捲軸，確保寬度一致 */
+}
+
+#text-input-backdrop {
+    color: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 2px solid transparent;
+    background-color: transparent; /* 確保背景透明 */
+    pointer-events: none; /* 讓點擊穿透到 textarea */
+    z-index: 5; /* 位於 textarea 下層 */
+}
+
+.textarea-wrapper textarea {
+    z-index: 10; /* 位於上層 */
+    background-color: transparent; /* 讓高亮透出來 */
+}
+
+#text-input-backdrop {
+    color: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 2px solid transparent; /* Match textarea border width */
+}
+
+/* 高亮樣式 */
+.highlight-keyword {
+    background-color: #e0e7ff; /* indigo-100 */
+    border-bottom: 2px solid #818cf8; /* indigo-400 */
+    border-radius: 2px;
+    color: transparent;
+}
+
+.highlight-vocab {
+    background-color: #d1fae5; /* emerald-100 */
+    border-bottom: 2px solid #34d399; /* emerald-400 */
+    border-radius: 2px;
+    color: transparent;
+}
+
+/* 捲軸強化樣式 */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c7d2fe; /* indigo-200 */
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #818cf8; /* indigo-400 */
+}
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #c7d2fe #f1f1f1;
+}
+
+/* 強制版本歷程彈窗高度與捲動 */
+#version-modal .flex-col {
+    max-height: 80vh !important;
+}
+#version-history-content {
+    max-height: calc(80vh - 100px) !important;
+    overflow-y: auto !important;
+    display: block !important;
 }
