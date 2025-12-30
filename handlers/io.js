@@ -33,10 +33,17 @@ export function handleFile(file) {
         reader.onload = async (e) => {
             try {
                 ui.showLoader('正在讀取 PDF 檔案...');
-                await loadScript(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js`);
+                await loadScript(`https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js`);
                 const pdfjsLib = window.pdfjsLib;
-                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
-                const pdf = await pdfjsLib.getDocument(new Uint8Array(e.target.result)).promise;
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+                
+                const loadingTask = pdfjsLib.getDocument({
+                    data: new Uint8Array(e.target.result),
+                    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+                    cMapPacked: true,
+                });
+                
+                const pdf = await loadingTask.promise;
                 let text = '';
                 for (let i = 1; i <= pdf.numPages; i++) { 
                     const page = await pdf.getPage(i); 
