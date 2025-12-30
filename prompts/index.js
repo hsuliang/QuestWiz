@@ -9,21 +9,11 @@ import { QUESTION_SCHEMA } from './blocks/question_schema.js';
 
 export { PROMPT_VERSION } from './versions.js';
 
-/**
- * 取得學習內容生成的 System Instruction
- */
 export function getContentSystemInstruction(params) {
-    // 簡單地將角色與規則區塊組合起來
-    return [
-        CONTENT_ROLE.trim(),
-        getContentRules(params).trim()
-    ].join('\n\n');
+    return [CONTENT_ROLE.trim(), getContentRules(params).trim()].join('\n\n');
 }
 
-/**
- * 取得題目生成的 System Instruction
- */
-export function getQuestionSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution) {
+export function getQuestionSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords = []) {
     let typeText = "";
     if (type === 'multiple_choice') typeText = "選擇題 (Multiple Choice)";
     else if (type === 'true_false') typeText = "是非題 (True/False)";
@@ -37,17 +27,30 @@ export function getQuestionSystemInstruction(count, type, difficulty, style, lan
     // 2. 風格規則
     const styleRules = style === QUESTION_STYLE.COMPETENCY_BASED ? COMPETENCY_RULES : STANDARD_RULES;
 
-    // 3. 組合所有部分
+    // 3. 處理關鍵字指令 (如果有選取的話)
+    let keywordInstruction = "";
+    if (keywords && keywords.length > 0) {
+        keywordInstruction = `
+### ⚠️ 核心命題任務 (Teacher's Constraints)
+老師已明確標記以下「${keywords.length} 個重點」為本次測驗的核心考點。
+請遵守以下命題邏輯：
+1. **重點優先**：請優先針對這些重點設計題目。
+2. **智慧分配**：若重點數量 (${keywords.length}) 大於預定總題數 (${count} 題)，請優先挑選「最核心、最具代表性」的點進行命題，確保總題數精準維持在 ${count} 題。
+3. **不要超出題數**：嚴禁因為重點多就產生多於 ${count} 個題目。
+4. **重點列表**：
+   - ${keywords.join('\n   - ')}
+        `.trim();
+    }
+
+    // 4. 組合所有部分
     return [
         rolePart,
+        keywordInstruction, // 插入關鍵字指令
         styleRules.trim(),
         QUESTION_SCHEMA.trim()
     ].join('\n\n');
 }
 
-/**
- * 取得題目生成的 User Prompt (保持原樣，這部分很短沒拆)
- */
 export function getQuestionUserPrompt({ count, bloomLevel }) {
     return `請根據提供的參考內容，生成題目並給予一個語意完整的專業標題。`;
 }
