@@ -3,265 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuestWiz 使用說明書 - ㄚ亮笑長的出題助手</title>
+    <title>程式說明 | ㄚ亮笑長的出題助手</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
     <style>
-        /* 針對說明頁面的額外樣式微調 */
-        body {
-            background-color: #f8fafc;
-            color: #334155;
-            line-height: 1.6;
-        }
-        .guide-section {
-            @apply bg-white p-8 rounded-2xl shadow-sm border border-gray-200 mb-8 scroll-mt-24;
-        }
-        .guide-title {
-            @apply text-2xl font-bold mb-4 pb-2 border-b border-gray-100 flex items-center;
-            color: var(--heading-color);
-        }
-        .step-number {
-            @apply inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold mr-3 text-sm flex-shrink-0;
-        }
-        .feature-card {
-            @apply bg-gray-50 p-4 rounded-lg border border-gray-100 hover:shadow-md transition-shadow;
-        }
-        code {
-            @apply bg-gray-100 text-red-500 px-1 rounded text-sm font-mono;
-        }
-        a {
-            @apply text-blue-600 hover:text-blue-800 hover:underline;
-        }
+        body { font-family: 'Noto Sans TC', sans-serif; scroll-behavior: smooth; }
+        .themed-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .feature-card { transition: all 0.3s ease; }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+        .step-number { background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%); }
     </style>
 </head>
-<body>
-    <!-- 導覽列 -->
-    <nav class="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50 border-b border-gray-200">
-        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center">
-                <img src="https://hsuliang.github.io/Aliang.png" alt="Logo" class="h-8 w-8 mr-3">
-                <span class="text-xl font-bold text-gray-800">ㄚ亮笑長的出題助手 使用說明</span>
+<body class="bg-gray-50 text-gray-800 leading-relaxed">
+
+    <!-- Header / Nav -->
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="https://hsuliang.github.io/Aliang.png" alt="Logo" class="h-10">
+                <span class="text-xl font-bold text-gray-900 tracking-tight">ㄚ亮笑長的出題助手</span>
             </div>
-            <div class="hidden md:flex space-x-6">
-                <a href="#intro" class="text-gray-600 hover:text-indigo-600 font-medium no-underline">簡介</a>
-                <a href="#quick-start" class="text-gray-600 hover:text-indigo-600 font-medium no-underline">快速上手</a>
-                <a href="#features" class="text-gray-600 hover:text-indigo-600 font-medium no-underline">功能詳解</a>
-                <a href="#faq" class="text-gray-600 hover:text-indigo-600 font-medium no-underline">常見問題</a>
-                <a href="#history" class="text-gray-600 hover:text-indigo-600 font-medium no-underline">版本歷程</a>
-            </div>
-            <a href="index.html" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors no-underline">
-                回到程式
+            <a href="index.html" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full text-sm font-bold transition-all shadow-md active:scale-95">
+                返回出題 ➔
             </a>
         </div>
-    </nav>
+    </header>
 
-    <!-- 主要內容 -->
-    <div class="container mx-auto px-4 py-8 mt-20 max-w-4xl">
-
-        <!-- 簡介區塊 -->
-        <section id="intro" class="guide-section text-center">
-            <h1 class="text-4xl md:text-5xl font-bold mb-6 text-indigo-900">歡迎使用 ㄚ亮笑長的出題助手</h1>
-            <p class="text-xl text-gray-600 mb-8">由 Google Gemini AI 強力驅動，專為教育工作者設計的智慧題庫生成神器。</p>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-                <div class="feature-card">
-                    <div class="text-3xl mb-2">🚀</div>
-                    <h3 class="font-bold text-lg mb-2">極速生成</h3>
-                    <p class="text-gray-500 text-sm">只需貼上文章、網址或圖片，AI 即可在幾秒鐘內自動分析重點並產出題目。</p>
-                </div>
-                <div class="feature-card">
-                    <div class="text-3xl mb-2">📂</div>
-                    <h3 class="font-bold text-lg mb-2">多格式支援</h3>
-                    <p class="text-gray-500 text-sm">一鍵匯出 Wordwall, Kahoot, LoiLoNote, PDF 考卷等多種教學平台格式。</p>
-                </div>
-                <div class="feature-card">
-                    <div class="text-3xl mb-2">🎨</div>
-                    <h3 class="font-bold text-lg mb-2">客製化出題</h3>
-                    <p class="text-gray-500 text-sm">自由設定學生程度、題目難易度、素養導向風格，甚至自訂 AI 寫作語氣。</p>
-                </div>
+    <!-- Hero Section -->
+    <section class="themed-gradient text-white py-20 px-6">
+        <div class="container mx-auto text-center max-w-4xl">
+            <div class="inline-block bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-sm font-medium mb-6">
+                ✨ 穩定版 V9.8.4 正式發佈
             </div>
-        </section>
-    <p>
-        <!-- 快速上手 -->
-        <section id="quick-start" class="guide-section">
-            <h2 class="guide-title">
-                <span class="bg-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-lg shadow-md">1</span>
-                快速上手三步驟
-            </h2>
-            
-            <div class="space-y-8">
-                <div class="border-l-4 border-indigo-100 pl-6 py-2">
-                    <h3 class="font-bold text-lg mb-2 flex items-center"><span class="step-number">1</span>設定 API Key</h3>
-                    <p class="text-gray-600 text-sm mb-3">
-                        本程式使用 Google Gemini API。首次使用請點擊左上角「常用設定」中的「API 金鑰」，貼上您的 Key 並儲存。<br>
-                        <span class="text-xs text-gray-400">(金鑰僅暫存於您的瀏覽器，有效期限 2 小時，安全無虞)</span>
-                    </p>
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md inline-flex items-center text-indigo-600 no-underline">
-                        👉 點此申請免費 API Key
-                    </a>
-                </div>
-
-                <div class="border-l-4 border-indigo-100 pl-6 py-2">
-                    <h3 class="font-bold text-lg mb-2 flex items-center"><span class="step-number">2</span>提供內容素材</h3>
-                    <p class="text-gray-600 text-sm">
-                        在左側「提供內容」區塊，您可以：
-                    </p>
-                    <ul class="list-disc list-inside text-sm text-gray-600 mt-2 ml-2 space-y-1">
-                        <li><strong>貼上文字</strong>：直接複製貼上教學講義。</li>
-                        <li><strong>上傳圖片</strong>：拍下課本或講義，AI 會自動讀圖。</li>
-                        <li><strong>貼上網址</strong>：支援一般網頁或 YouTube 影片(需字幕)。</li>
-                        <li><strong>AI 生成</strong>：輸入主題（如「光合作用」），讓 AI 幫您寫文章！</li>
-                    </ul>
-                </div>
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-8 leading-tight">
+                讓 AI 成為您最得力的<br><span class="text-yellow-300">教學輔助大腦</span>
+            </h1>
+            <p class="text-xl md:text-2xl text-indigo-100 mb-10 leading-relaxed">
+                專為教育工作者打造的 AI 命題神器，<br class="hidden md:block">
+                從 K-12 基礎檢索到情境式素養命題，一鍵精準完成。
             </p>
-                <div class="border-l-4 border-indigo-100 pl-6 py-2">
-                    <h3 class="font-bold text-lg mb-2 flex items-center"><span class="step-number">3</span>設定並出題</h3>
-                    <p class="text-gray-600 text-sm mb-2">
-                        確認下方的「題目生成設定」：
-                    </p>
-                    <ul class="list-disc list-inside text-sm text-gray-600 ml-2 mb-4">
-                        <li>填寫 <strong>試卷標題</strong> (選填)</li>
-                        <li>選擇 <strong>學生程度</strong> (這很重要！影響題目深淺)</li>
-                        <li>選擇 <strong>匯出格式</strong> (如 PDF 考卷、Wordwall 等)</li>
-                        <li>設定 <strong>題目數量</strong> 與 <strong>類型</strong></li>
-                    </ul>
-                    <p class="text-gray-600 text-sm">
-                        最後按下 <span class="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs font-bold">開始出題</span>，AI 就會開始工作囉！
-                    </p>
-                </div>
+            <div class="bg-white/10 p-6 rounded-2xl border border-white/20 inline-block text-left max-w-2xl">
+                <p class="italic text-lg">「出題，不該是老師的夢靨，而該是教學創意的延伸。」</p>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <!-- 功能詳解 -->
-        <section id="features" class="guide-section">
-            <h2 class="guide-title">
-                <span class="bg-purple-500 text-white w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-lg shadow-md">2</span>
-                進階功能詳解
-            </h2>
-
-            <div class="grid grid-cols-1 gap-6">
-                <div class="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
-                    <h3 class="font-bold text-lg text-purple-700 mb-2">✨ AI 生成學習內文</h3>
-                    <p class="text-sm text-gray-600 mb-2">
-                        沒有現成的文章？沒問題！切換到 <strong>「✨ AI 生成內容」</strong> 分頁。
-                    </p>
-                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                        <li>輸入簡單的主題關鍵字 (如：台灣地理)。</li>
-                        <li>選擇 <strong>「學生程度」</strong>，AI 會自動調整文章難易度。</li>
-                        <li>勾選 <strong>「素養導向」</strong>，AI 會撰寫更具生活情境的文章。</li>
-                        <li>甚至可以自訂「寫作語氣」（如：活潑有趣、嚴謹學術）。</li>
-                    </ul>
-                </div>
-
-                <div class="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
-                    <h3 class="font-bold text-lg text-blue-700 mb-2">📄 PDF 考卷與 TXT 匯出</h3>
-                    <p class="text-sm text-gray-600 mb-2">
-                        想要傳統紙筆測驗？QuestWiz 也能辦到！
-                    </p>
-                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                        <li>在匯出格式選擇 <strong>「PDF 考卷 (A4)」</strong>。</li>
-                        <li>填寫 <strong>「試卷標題」</strong> (選填)，這會成為考卷的大標題與檔名。</li>
-                        <li>系統會自動生成包含卷頭（班級/姓名/座號/得分）的 A4 格式考卷供下載列印。</li>
-                        <li>若需要純文字以便在 Word 編輯，可選擇 <strong>「純文字檔 (.txt)」</strong>，包含題目與最後的解答列表。</li>
-                    </ul>
-                </div>
-
-                <div class="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm">
-                    <h3 class="font-bold text-lg text-green-700 mb-2">🔗 內容分享功能</h3>
-                    <p class="text-sm text-gray-600 mb-2">
-                        課堂即時閱讀神器！
-                    </p>
-                    <p class="text-sm text-gray-600">
-                        生成或貼上文章後，點擊輸入框下方的 <strong>「分享內容」</strong> 按鈕。系統會產生一個專屬的 <strong>QR Code</strong> 與連結，學生掃描後即可在手機上閱讀該篇文章（純閱讀模式，無干擾）。
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- 常見問題 -->
-        <section id="faq" class="guide-section">
-            <h2 class="guide-title">
-                <span class="bg-orange-500 text-white w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-lg shadow-md">?</span>
-                常見問題 (FAQ)
+    <!-- Core Features -->
+    <section class="py-20 px-6">
+        <div class="container mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-16 relative">
+                四大核心亮點
+                <span class="block w-12 h-1.5 bg-indigo-500 mx-auto mt-4 rounded-full"></span>
             </h2>
             
-            <div class="space-y-4">
-                <details class="group bg-gray-50 rounded-lg">
-                    <summary class="flex justify-between items-center font-medium cursor-pointer list-none p-4">
-                        <span>Q: 為什麼我匯入 PDF 檔案後，文字框卻是空白的？</span>
-                        <span class="transition group-open:rotate-180">
-                            <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div class="text-gray-600 text-sm mt-0 group-open:animate-fadeIn p-4 pt-0 border-t border-gray-200/50">
-                        <p class="mt-2">這通常是因為該 PDF 檔案是由<strong>圖片</strong>或是<strong>掃描文件</strong>組成的（沒有文字層）。目前的技術只能讀取包含可選取文字的 PDF。建議您使用 OCR 工具將圖片轉為文字後再貼上。</p>
-                        <p class="mt-1 text-red-500 font-medium">注意：由此程式生成的 PDF 考卷也是圖片格式，因此無法再次被本程式讀取喔！</p>
-                    </div>
-                </details>
-
-                <details class="group bg-gray-50 rounded-lg">
-                    <summary class="flex justify-between items-center font-medium cursor-pointer list-none p-4">
-                        <span>Q: API Key 會被偷走嗎？安全嗎？</span>
-                        <span class="transition group-open:rotate-180">
-                            <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div class="text-gray-600 text-sm mt-0 group-open:animate-fadeIn p-4 pt-0 border-t border-gray-200/50">
-                        <p class="mt-2">絕對安全。您的 API Key 只會儲存在您<strong>當前使用的瀏覽器</strong>暫存區 (Session Storage) 中，並且我們設定了 2 小時自動過期機制。金鑰只會直接傳送給 Google 伺服器進行驗證，不會經過我們的後台，也不會被他人看見。</p>
-                    </div>
-                </details>
-
-                <details class="group bg-gray-50 rounded-lg">
-                    <summary class="flex justify-between items-center font-medium cursor-pointer list-none p-4">
-                        <span>Q: 為什麼有時候生成的題目會變少？</span>
-                        <span class="transition group-open:rotate-180">
-                            <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div class="text-gray-600 text-sm mt-0 group-open:animate-fadeIn p-4 pt-0 border-t border-gray-200/50">
-                        <p class="mt-2">這可能受限於 AI 的單次輸出長度限制，或者您提供的文章內容較短，AI 難以從中挖掘出足夠數量的題目。建議您可以分批生成（例如一次生 5 題），或是提供更豐富的內文素材。</p>
-                    </div>
-                </details>
-            </div>
-        </section>
-
-        <!-- 版本修正歷程 -->
-        <section id="history" class="guide-section">
-            <h2 class="guide-title">
-                <span class="bg-gray-600 text-white w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-lg shadow-md">H</span>
-                版本修正歷程
-            </h2>
-            
-            <div class="space-y-4">
-                <div class="bg-white p-4 rounded-lg border-l-4 border-gray-600 shadow-sm">
-                    <h3 class="font-bold text-lg text-gray-800 mb-2">v8.5 (2025/12/12)</h3>
-                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
-                        <li>新增支援 <strong>Blooket</strong> 平台 CSV 格式匯出。</li>
-                        <li>新增支援 <strong>Gimkit</strong> 平台 CSV 格式匯出。</li>
-                        <li>優化匯出格式選單順序 (Wayground 前移)。</li>
-                    </ul>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="text-4xl mb-6">⚡️</div>
+                    <h3 class="text-xl font-bold mb-4">雙軌命題引擎</h3>
+                    <p class="text-gray-500 text-sm mb-4 leading-loose">
+                        <span class="font-bold text-indigo-600">記憶型</span>：精準直述句檢測定義與事實。<br>
+                        <span class="font-bold text-purple-600">素養型</span>：導入真實情境，訓練跨領域解決能力。
+                    </p>
+                </div>
+                <!-- Feature 2 -->
+                <div class="feature-card bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="text-4xl mb-6">👶</div>
+                    <h3 class="text-xl font-bold mb-4">K-12 適性化大腦</h3>
+                    <p class="text-gray-500 text-sm mb-4 leading-loose">
+                        內建閱讀分級規範，自動調整語彙難度。對低年級自動屏蔽成語；對高中生啟動學術論述。
+                    </p>
+                </div>
+                <!-- Feature 3 -->
+                <div class="feature-card bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="text-4xl mb-6">📝</div>
+                    <h3 class="text-xl font-bold mb-4">多模態內容生成</h3>
+                    <p class="text-gray-500 text-sm mb-4 leading-loose">
+                        沒素材也能出題！支援寫作科普文、新聞、微小說。支援圖片辨識、PDF 匯入與 YouTube 擷取。
+                    </p>
+                </div>
+                <!-- Feature 4 -->
+                <div class="feature-card bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="text-4xl mb-6">🛠️</div>
+                    <h3 class="text-xl font-bold mb-4">專業級控制台</h3>
+                    <p class="text-gray-500 text-sm mb-4 leading-loose">
+                        支援布魯姆認知層次精確配題。高品質模式啟動 <span class="font-bold">CoT 思維鏈</span>，強化邏輯嚴謹度。
+                    </p>
                 </div>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <!-- 頁尾 -->
-        <footer class="text-center text-gray-500 text-sm mt-12 mb-8">
-            <p>&copy; 2025 ㄚ亮笑長練功坊. All rights reserved.</p>
-            <p class="mt-2">本工具僅供教育輔助使用，生成內容請務必經由教師人工審核。</p>
-        </footer>
+    <!-- Export Formats -->
+    <section class="bg-gray-100 py-20 px-6">
+        <div class="container mx-auto max-w-5xl">
+            <div class="flex flex-col md:flex-row items-center gap-12">
+                <div class="flex-1 text-center md:text-left">
+                    <h2 class="text-3xl font-bold mb-6">支援多款主流教學格式</h2>
+                    <p class="text-gray-600 mb-8 leading-loose text-lg">
+                        我們了解老師在不同平台間轉換的辛苦。QuestWiz 生成的題目可直接匯出為各類數位平台專用檔案，節省您手動輸入的時間。
+                    </p>
+                    <div class="flex flex-wrap gap-3 justify-center md:justify-start">
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">PDF 考卷</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">Wordwall</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">Kahoot!</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">Blooket</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">Gimkit</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">LoiLoNote</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">Wayground</span>
+                        <span class="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold">文字檔 (.txt)</span>
+                    </div>
+                </div>
+                <div class="flex-1 grid grid-cols-2 gap-4">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="text-3xl mb-2">📄</div>
+                        <div class="font-bold">紙筆測驗</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="text-3xl mb-2">🎮</div>
+                        <div class="font-bold">遊戲互動</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="text-3xl mb-2">📱</div>
+                        <div class="font-bold">行動學習</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="text-3xl mb-2">☁️</div>
+                        <div class="font-bold">雲端共享</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
-    </div>
-    <script>
-        // 簡單的滾動行為優化
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
-            });
-        });
-    </script>
+    <!-- Quick Start Guide -->
+    <section class="py-20 px-6">
+        <div class="container mx-auto max-w-4xl text-center">
+            <h2 class="text-3xl font-bold mb-16">快速上手指南</h2>
+            <div class="space-y-12">
+                <div class="flex items-start gap-6 text-left group">
+                    <div class="step-number w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform">1</div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-2">設定金鑰</h4>
+                        <p class="text-gray-500 leading-relaxed">點擊右上角「設定」，貼入您的 Google Gemini API Key。<b>您可以一次貼入多組金鑰（以換行分隔）</b>，系統會自動輪替使用以確保最佳出題效率。</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-6 text-left group border-l-2 border-dashed border-gray-200 ml-6 pl-12 py-4">
+                    <div class="step-number w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xl shadow-lg -ml-[74px] group-hover:scale-110 transition-transform">2</div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-2">提供素材</h4>
+                        <p class="text-gray-500 leading-relaxed">貼上文字、上傳講義照片，或直接輸入主題讓 AI 為您撰寫教學文章。</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-6 text-left group border-l-2 border-dashed border-gray-200 ml-6 pl-12 py-4">
+                    <div class="step-number w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xl shadow-lg -ml-[74px] group-hover:scale-110 transition-transform">3</div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-2">調整參數與出題</h4>
+                        <p class="text-gray-500 leading-relaxed">選擇年級、出題風格與層次後點擊「開始出題」，AI 將在數秒內為您交卷。</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-6 text-left group ml-6 pl-12 py-4">
+                    <div class="step-number w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xl shadow-lg -ml-[74px] group-hover:scale-110 transition-transform">4</div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-2">預覽與分享</h4>
+                        <p class="text-gray-500 leading-relaxed">在預覽區進行最後校對與排序，接著下載檔案或上傳至題庫大廳分享成果。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="bg-gray-50 py-20 px-6 border-t border-gray-200">
+        <div class="container mx-auto max-w-3xl">
+            <h2 class="text-3xl font-bold text-center mb-16 font-bold">常見問題</h2>
+            <div class="space-y-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h4 class="text-lg font-bold text-indigo-700 mb-3 flex items-center">
+                        <span class="mr-2">Q:</span> 為什麼我有時候會遇到「配額不足」的錯誤？
+                    </h4>
+                    <p class="text-gray-600 leading-relaxed pl-7">
+                        A: Google API 有每日及每分鐘的使用量限制。建議您申請多組 API Key 並貼入設定中（以換行分隔），系統會自動進行負載平衡，將出題效率最大化。
+                    </p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h4 class="text-lg font-bold text-indigo-700 mb-3 flex items-center">
+                        <span class="mr-2">Q:</span> 素養題生成速度好像比較慢？
+                    </h4>
+                    <p class="text-gray-600 leading-relaxed pl-7">
+                        A: 是的。素養題需要 AI 先行構思真實生活情境，並進行跨段落的邏輯推理，運算時間會比傳統知識型題目稍長，請耐心等候精采內容。
+                    </p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h4 class="text-lg font-bold text-indigo-700 mb-3 flex items-center">
+                        <span class="mr-2">Q:</span> 我生成的題目可以分享給其他老師嗎？
+                    </h4>
+                    <p class="text-gray-600 leading-relaxed pl-7">
+                        A: 當然！點擊「上傳至題庫大廳」，您的智慧結晶就能嘉惠社群；同時您也可以在大廳中搜尋並下載其他老師分享的優秀考卷。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-12 text-center px-6">
+        <div class="container mx-auto">
+            <div class="flex flex-col items-center mb-8">
+                <div class="bg-white p-2 rounded-xl mb-4 shadow-inner">
+                    <img src="https://hsuliang.github.io/Aliang.png" alt="Logo" class="h-12">
+                </div>
+                <p class="text-white font-bold text-lg mb-2">ㄚ亮笑長的出題助手</p>
+                <p class="text-sm">由 Google Gemini Pro / Flash Models 強力驅動</p>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-xs max-w-2xl mx-auto leading-loose">
+                本工具為免費教育輔助軟體，旨在減輕教師行政負擔。AI 生成內容偶有誤差，使用前請務必進行專業的人工審閱。<br>
+                © 2026 ㄚ亮笑長練功坊. All Rights Reserved.
+            </div>
+        </div>
+    </footer>
+
 </body>
 </html>

@@ -105,17 +105,29 @@ export function isAdminMode() { return appState.isAdmin; }
 
 // --- Draft Storage ---
 let saveTimeout = null;
-function performSave() {
-    try {
-        const draftData = { 
-            generatedQuestions: state.generatedQuestions, 
-            uploadedImages: state.uploadedImages, 
-            selectedKeywords: state.selectedKeywords,
-            timestamp: Date.now() 
-        };
-        localStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(draftData));
-    } catch (e) { console.error('草稿儲存失敗:', e); }
-}
+    const performSave = () => {
+        try {
+            // 建立一個不包含圖片數據的乾淨狀態副本
+            const stateToSave = { ...state };
+            // 圖片數據太大，localStorage 存不下 (QuotaExceededError)，故不存
+            if (stateToSave.uploadedImages) {
+                stateToSave.uploadedImages = []; 
+            }
+
+            localStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(stateToSave));
+            // console.log('[State] Draft saved.');
+        } catch (e) {
+            console.error('[State] 草稿儲存失敗:', e);
+            // 如果還是失敗 (例如文字太多)，嘗試只存最核心設定
+            try {
+                const minimalState = {
+                    apiKey: state.apiKey,
+                    questions: state.generatedQuestions
+                };
+                localStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(minimalState));
+            } catch (e2) { /* Give up */ }
+        }
+    };
 export function saveDraftState() {
     if (saveTimeout) clearTimeout(saveTimeout); 
     saveTimeout = setTimeout(() => { performSave(); saveTimeout = null; }, 500);

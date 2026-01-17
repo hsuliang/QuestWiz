@@ -1,17 +1,16 @@
 // --- 組態常數 ---
 export const CONFIG = {
-    // 基礎 API 位址
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-    // 指定模型名稱 (目前穩定版本 2.5)
-    MODEL_NAME: 'gemini-2.5-flash', 
-    
-    API_BATCH_SIZE: 6,
-    DEBOUNCE_DELAY: 800,
-    MAX_FILE_SIZE_BYTES: 20 * 1024 * 1024, // 20MB
-    MAX_IMAGE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
-    MAX_TOTAL_IMAGE_SIZE_BYTES: 30 * 1024 * 1024, // 30MB
-    
-    // Cloud Function 真實網址
+    MODEL_NAME: 'gemini-2.5-flash-lite', // 保留預設值作為回退
+    MODELS: {
+        STANDARD: 'gemini-2.5-flash-lite',
+        HIGH_QUALITY: 'gemini-3-flash-preview',
+        HIGH_QUALITY_BACKUP: 'gemini-2.5-flash' // [New] 備援模型
+    },
+    QUOTAS: {
+        STANDARD: { RPM: 15, RPD: 1500, DELAY: 4000 },
+        HIGH_QUALITY: { RPM: 5, RPD: 20, DELAY: 12000 } // 維持高延遲以適應 thinking
+    },
     ADD_CONTENT_URL: 'https://addcontent-2xblwpocfa-de.a.run.app',
     VIEW_PAGE_URL: 'view.html',
     EXTRACT_URL_FUNCTION_URL: 'https://extractcontentfromurl-2xblwpocfa-de.a.run.app',

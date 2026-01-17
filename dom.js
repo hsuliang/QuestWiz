@@ -13,8 +13,9 @@ export const elements = {
     get toggleApiStepsBtn() { return document.getElementById('toggle-api-steps-btn'); },
     get apiStepsContainer() { return document.getElementById('api-steps-container'); },
     get apiStepsArrow() { return document.getElementById('api-steps-arrow'); },
-    get layoutToggleBtn() { return document.getElementById('layout-toggle-btn'); },
     get themeRadios() { return document.querySelectorAll('input[name="theme"]'); },
+    get modelRadios() { return document.querySelectorAll('input[name="model-mode"]'); },
+    get modelQuotaWarning() { return document.getElementById('model-quota-warning'); },
     get mainContainer() { return document.getElementById('main-container'); },
 
     // 提供內容 (Content Input)
@@ -41,6 +42,10 @@ export const elements = {
     get generateContentBtn() { return document.getElementById('generate-content-btn'); },
     get extractFromUrlBtn() { return document.getElementById('extract-from-url-btn'); },
     get editPromptBtn() { return document.getElementById('edit-prompt-btn'); },
+    get studentLevelSelectContent() { return document.getElementById('student-level-select'); }, // [Fix] 補回遺失的引用
+    get adaptiveWordCount() { return document.getElementById('adaptive-word-count'); }, // [Phase 2]
+    get domainSelectContent() { return document.getElementById('domain-select-content'); }, // [Phase 4.2]
+    get readingTimeBadge() { return document.getElementById('reading-time-badge'); }, // [Phase 4.2]
 
     // [New] Phase 1: 內容分析與標記
     get analyzeContentBtn() { return document.getElementById('analyze-content-btn'); },
@@ -58,7 +63,14 @@ export const elements = {
     get questionTypeSelect() { return document.getElementById('question-type-select'); },
     get difficultySelect() { return document.getElementById('difficulty-select'); },
     get questionStyleSelect() { return document.getElementById('question-style-select'); },
+    get domainSelectQuiz() { return document.getElementById('domain-select-quiz'); }, // [Phase 4.2]
+    get competencyContextContainer() { return document.getElementById('competency-context-container'); }, // [Phase 4.2]
+    get contextTypeSelect() { return document.getElementById('context-type-select'); }, // [Phase 4.2]
     get competencyBasedCheckbox() { return document.getElementById('competency-based-checkbox'); },
+    
+    // Expert Mode
+    get expertGenerateBtn() { return document.getElementById('expert-generate-btn'); },
+    get expertTextInput() { return document.getElementById('expert-text-input'); },
     
     // 布魯姆認知層次 (Bloom Taxonomy)
     get toggleBloomBtn() { return document.getElementById('toggle-bloom-btn'); },

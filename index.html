@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v11.0 EXPERT MODE ACTIVE -->
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
@@ -30,7 +31,7 @@
 
 
     <div id="page-wrapper">
-        <div class="container mx-auto p-4 md:p-8">
+        <div class="container mx-auto p-4 md:p-8 pb-20">
 
             <header class="text-center mb-10 relative">
                 <div class="flex justify-center items-center mb-4">
@@ -62,11 +63,11 @@
 
                         <div id="common-settings-content" class="collapsible-content">
                             <div class="border-b border-gray-200">
-                                <nav class="settings-tab-nav -mb-px flex space-x-4" aria-label="Settings Tabs" role="tablist">
-                                    <button id="settings-tab-api" class="settings-tab-btn active" role="tab" data-i18n="tab_api">API 金鑰</button>
-                                    <button id="settings-tab-level" class="settings-tab-btn" role="tab" data-i18n="tab_level">學生程度</button>
+                                <nav class="-mb-px flex space-x-4 overflow-x-auto custom-scrollbar">
+                                    <button class="settings-tab-btn active whitespace-nowrap" data-i18n="tab_api">API 金鑰</button>
+                                    <button class="settings-tab-btn whitespace-nowrap" data-i18n="tab_model">模型設定</button>
+                                    <button class="settings-tab-btn whitespace-nowrap" data-i18n="tab_level">學生程度</button>
                                     <button id="settings-tab-theme" class="settings-tab-btn" role="tab" data-i18n="tab_theme">布景主題</button>
-                                    <button id="settings-tab-layout" class="settings-tab-btn" role="tab" data-i18n="tab_layout">介面</button>
                                     <button id="settings-tab-language" class="settings-tab-btn" role="tab" data-i18n="tab_language">語言</button>
                                 </nav>
                             </div>
@@ -98,8 +99,8 @@
                                     </div>
 
                                     <div class="relative">
-                                        <input type="password" id="api-key-input" class="w-full p-2 border border-gray-300 rounded-md text-sm pr-10" placeholder="請貼上您的 API Key" data-i18n-placeholder="api_placeholder">
-                                        <button type="button" id="toggle-api-key-visibility" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 focus:outline-none">
+                                        <textarea id="api-key-input" class="w-full p-2 border border-gray-300 rounded-md text-sm pr-10 custom-scrollbar" rows="3" style="resize: none;" placeholder="可貼上多組金鑰，請以逗號或換行分隔" data-i18n-placeholder="api_placeholder_multi"></textarea>
+                                        <button type="button" id="toggle-api-key-visibility" class="absolute top-2 right-2 flex items-center px-2 text-gray-500 hover:text-gray-700 focus:outline-none">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -114,17 +115,39 @@
                                         金鑰將暫存 2 小時，關閉分頁後即失效。請勿在公用電腦上儲存。
                                     </p>
                                 </div>
+                                <!-- 模型設定 -->
+                                <div id="settings-content-model" class="settings-tab-content" role="tabpanel">
+                                    <label class="block text-sm font-bold text-gray-700 mb-3">請選擇 AI 思考模型：</label>
+                                    <div class="space-y-3">
+                                        <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative">
+                                            <input type="radio" name="model-mode" value="standard" class="mt-1 mr-3 text-indigo-600 focus:ring-indigo-500" checked>
+                                            <div>
+                                                <span class="block text-sm font-bold text-gray-800">🚀 標準模式 (Lite)</span>
+                                                <span class="block text-xs text-gray-500 mt-1">速度快、額度略高。適合一般大量出題。</span>
+                                            </div>
+                                        </label>
+                                        <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative">
+                                            <input type="radio" name="model-mode" value="high-quality" class="mt-1 mr-3 text-indigo-600 focus:ring-indigo-500">
+                                            <div>
+                                                <span class="block text-sm font-bold text-indigo-700">🧠 高品質模式 (Flash)</span>
+                                                <span class="block text-xs text-gray-500 mt-1">推理強、額度較低。適合專家命題與複雜邏輯。</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div id="model-quota-warning" class="mt-3 p-2 bg-amber-50 text-amber-700 text-xs rounded border border-amber-100 hidden">
+                                        ⚠️ 注意：高品質模式每日僅限 20 次請求，請謹慎使用。
+                                    </div>
+                                </div>
                                 <div id="settings-content-level" class="settings-tab-content" role="tabpanel">
                                      <div>
                                         <label for="student-level-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="level_label">請選擇學生程度 (K12)：</label>
                                         <select id="student-level-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm student-level-sync outline-none">
-                                            <option value="" disabled selected data-i18n="level_label">請選擇學生程度...</option>
+                                            <option value="" disabled selected data-i18n="level_placeholder">請選擇學習階段</option>
                                             <option value="1-2" data-i18n="level_1_2">低年級</option> 
                                             <option value="3-4" data-i18n="level_3_4">中年級</option> 
                                             <option value="5-6" data-i18n="level_5_6">高年級</option> 
                                             <option value="7-9" data-i18n="level_7_9">國中</option> 
                                             <option value="9-12" data-i18n="level_9_12">高中</option>
-                                            <option value="其他">其他</option>
                                         </select>
                                         <p class="text-xs text-gray-500 mt-2" data-i18n="level_hint">此設定將同時影響「AI生成內容」的文章難易度與「生成題目」的題目深淺。</p>
                                      </div>
@@ -140,12 +163,7 @@
                                         <label for="theme-burgundy-red" title="勃根地紅" class="theme-chooser"></label>
                                     </div>
                                 </div>
-                                <div id="settings-content-layout" class="settings-tab-content" role="tabpanel">
-                                    <button id="layout-toggle-btn" class="w-full flex items-center justify-center text-sm text-gray-600 font-semibold bg-gray-100 hover:bg-gray-200 p-2 rounded-lg transition-colors" data-i18n="layout_btn">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                                        切換左右欄
-                                    </button>
-                                </div>
+
                                 <div id="settings-content-language" class="settings-tab-content" role="tabpanel">
                                     <label class="block text-sm font-medium text-gray-700 mb-2" data-i18n="language_label">介面語言選擇：</label>
                                     <div class="flex gap-x-4">
@@ -196,7 +214,7 @@
                         <div id="content-text" class="tab-content active" role="tabpanel" aria-labelledby="tab-text">
                             <div class="textarea-wrapper relative">
                                 <!-- [New] 高亮背景層 -->
-                                <div id="text-input-backdrop" class="absolute inset-0 p-4 border-2 border-transparent text-sm leading-relaxed whitespace-pre-wrap break-words pointer-events-none overflow-hidden text-transparent select-none"></div>
+                                <div id="text-input-backdrop" class="absolute inset-0 p-4 border-2 border-transparent text-sm leading-relaxed whitespace-pre-wrap break-words pointer-events-none overflow-y-scroll text-transparent select-none"></div>
                                 
                                 <!-- 文字輸入框 -->
                                 <textarea id="text-input" rows="10" 
@@ -209,10 +227,6 @@
                                         <button id="add-selection-as-keyword-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 transition-colors">
                                             <span class="w-2 h-2 bg-indigo-500 rounded-full"></span>
                                             設為考點
-                                        </button>
-                                        <button id="add-selection-as-vocab-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50 border-t border-gray-100 transition-colors">
-                                            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                                            設為生字
                                         </button>
                                     </div>
                                     <!-- 小箭頭 -->
@@ -306,22 +320,70 @@
                                                 <option value="5-6" data-i18n="level_5_6">高年級</option> 
                                                 <option value="7-9" data-i18n="level_7_9">國中</option> 
                                                 <option value="9-12" data-i18n="level_9_12">高中</option>
-                                                <option value="其他" data-i18n="level_other">其他</option>
                                             </select>
                                          </div>
                                          <div>
                                             <label for="text-type-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_text_type_label">請選擇文本類型：</label>
                                             <select id="text-type-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                                <option value="科普說明文" selected data-i18n="text_type_expository">科普說明文</option>
+                                                <option value="" disabled selected>請選擇文本類型...</option>
+                                                <option value="科普說明文" data-i18n="text_type_expository">科普說明文</option>
                                                 <option value="情境故事文" data-i18n="text_type_story">情境故事文</option>
                                                 <option value="議論文" data-i18n="text_type_argumentative">議論文</option>
                                                 <option value="實用操作說明" data-i18n="text_type_practical">實用操作說明</option>
                                                 <option value="對話式劇本" data-i18n="text_type_script">對話式劇本</option>
+                                                <option disabled>--- 生活應用 ---</option>
+                                                <option value="新聞報導">新聞報導 (News)</option>
+                                                <option value="社群貼文">社群貼文 (Social Media)</option>
+                                                <option value="書信/Email">書信/Email</option>
+                                                <option value="旅遊指南">旅遊指南 (Guide)</option>
+                                                <option disabled>--- 創意文學 ---</option>
+                                                <option value="微小說">微小說 (Flash Fiction)</option>
+                                                <option value="現代詩">現代詩 (Poetry)</option>
+                                                <option value="科普漫畫腳本">科普漫畫腳本</option>
                                                 <option value="custom" data-i18n="text_type_custom">自訂...</option>
                                             </select>
                                             <input type="text" id="custom-text-type-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂文本類型..." data-i18n-placeholder="custom_text_type_placeholder">
                                          </div>
                                      </div>
+
+                                     <!-- [Phase 4.2] 學習領域選擇 -->
+                                     <div class="mt-4">
+                                        <label for="domain-select-content" class="block text-sm font-medium text-gray-700 mb-1">學習領域</label>
+                                        <select id="domain-select-content" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 domain-sync">
+                                            <option value="" disabled selected>請選擇學習領域...</option>
+                                            <option value="chinese">語文</option>
+                                            <option value="math">數學</option>
+                                            <option value="science">自然科學</option>
+                                            <option value="social">社會</option>
+                                            <option value="arts">藝術</option>
+                                            <option value="humanities">人文</option>
+                                            <option value="health">健體</option>
+                                            <option value="technology">科技</option>
+                                        </select>
+                                     </div>
+
+                                     <!-- [Phase 2.2] 適性化字數設定 (美化版) -->
+                                     <div class="mt-4">
+                                         <div class="flex justify-between items-end mb-2">
+                                             <div class="flex items-center gap-2">
+                                                <label class="block text-sm font-medium text-gray-700" data-i18n="word_count_label">內容篇幅</label>
+                                                <span id="reading-time-badge" class="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    預估閱讀：-- 分鐘
+                                                </span>
+                                             </div>
+                                             <span id="word-count-display" class="text-xs font-bold themed-accent-text">-- 字</span>
+                                         </div>
+                                         <div class="relative px-1">
+                                             <input type="range" id="word-count-slider" min="100" max="2000" step="50" class="themed-range-slider w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                             <div class="flex justify-between text-[10px] text-gray-400 font-medium mt-1">
+                                                 <span>短 (100)</span>
+                                                 <span>長 (2000)</span>
+                                             </div>
+                                         </div>
+                                         <input type="hidden" id="adaptive-word-count" value="">
+                                     </div>
+
                                      <div>
                                         <label for="learning-objectives-input" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_objectives_label">請輸入核心學習目標或關鍵詞彙 (條列式，AI會將其融入文章中)：</label>
                                         <textarea id="learning-objectives-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors" placeholder="例如：&#10;1. 理解光合作用需要光、水和二氧化碳。&#10;2. 知道會產生葡萄糖和氧氣。" data-i18n-placeholder="ai_objectives_placeholder"></textarea>
@@ -330,10 +392,19 @@
                                          <div>
                                             <label for="tone-select" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="ai_tone_label">請選擇寫作語氣：</label>
                                             <select id="tone-select" class="w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                                <option value="客觀中立" selected data-i18n="tone_neutral">客觀中立</option>
+                                                <option value="" disabled selected>請選擇寫作語氣...</option>
+                                                <option value="客觀中立" data-i18n="tone_neutral">客觀中立</option>
                                                 <option value="活潑有趣" data-i18n="tone_lively">活潑有趣</option>
                                                 <option value="嚴謹學術" data-i18n="tone_academic">嚴謹學術</option>
                                                 <option value="循循善誘" data-i18n="tone_persuasive">循循善誘</option>
+                                                <option disabled>--- 角色扮演 ---</option>
+                                                <option value="偵探懸疑">偵探懸疑 (解謎)</option>
+                                                <option value="網紅YouTuber">YouTuber (開箱/互動)</option>
+                                                <option value="導遊解說">導遊解說 (導覽)</option>
+                                                <option disabled>--- 特殊風格 ---</option>
+                                                <option value="幽默詼諧">幽默詼諧</option>
+                                                <option value="感性抒情">感性抒情</option>
+                                                <option value="史詩壯闊">史詩壯闊</option>
                                                 <option value="custom" data-i18n="tone_custom">自訂...</option>
                                             </select>
                                             <input type="text" id="custom-tone-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors mt-2 hidden" placeholder="請輸入自訂寫作語氣..." data-i18n-placeholder="custom_tone_placeholder">
@@ -399,21 +470,99 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                             <span data-i18n="quiz_settings_title">題目生成設定</span>
                         </h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <!-- 試卷標題：橫跨兩欄，確保寬敞 -->
-                            <div class="sm:col-span-2">
-                                <label for="quiz-title-input" class="block text-sm font-bold text-gray-700 mb-1" data-i18n="quiz_title_label">試卷標題：<span class="text-xs font-normal text-indigo-500 ml-1">AI生成試題後會自動填入</span></label>
-                                <input type="text" id="quiz-title-input" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="AI將會自動填入或自行命名" data-i18n-placeholder="quiz_title_placeholder">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                            <!-- 1. 試卷標題 (全寬) -->
+                            <div class="sm:col-span-3">
+                                <label for="quiz-title-input" class="flex items-center text-sm font-bold text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    <span data-i18n="quiz_title_label">試卷標題：</span>
+                                </label>
+                                <input type="text" id="quiz-title-input" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="AI將會自動填入或自行命名" data-i18n-placeholder="quiz_title_placeholder">
+                            </div>
+
+                            <!-- 2. 學習領域 (全寬) -->
+                            <div class="sm:col-span-3">
+                                <label for="domain-select-quiz" class="flex items-center text-sm font-bold text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5S19.832 5.477 21 6.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                                    <span>學習領域：</span>
+                                </label>
+                                <select id="domain-select-quiz" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:focus:border-indigo-500 domain-sync outline-none transition">
+                                    <option value="" disabled selected>請選擇學習領域...</option>
+                                    <option value="chinese">語文</option>
+                                    <option value="math">數學</option>
+                                    <option value="science">自然科學</option>
+                                    <option value="social">社會</option>
+                                    <option value="arts">藝術</option>
+                                    <option value="humanities">人文</option>
+                                    <option value="health">健體</option>
+                                    <option value="technology">科技</option>
+                                </select>
+                            </div>
+
+                            <!-- 3. 核心參數矩陣 (Row 1: 程度, 數量, 難度) -->
+                            <div>
+                                <label for="student-level-select-quiz" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.088 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" /></svg>
+                                    <span data-i18n="level_label">學生程度</span>
+                                </label>
+                                <select id="student-level-select-quiz" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:focus:border-indigo-500 student-level-sync outline-none transition">
+                                    <option value="" disabled selected data-i18n="level_placeholder">請選擇學習階段</option>
+                                    <option value="1-2" data-i18n="level_1_2">低年級</option> 
+                                    <option value="3-4" data-i18n="level_3_4">中年級</option> 
+                                    <option value="5-6" data-i18n="level_5_6">高年級</option> 
+                                    <option value="7-9" data-i18n="level_7_9">國中</option> 
+                                    <option value="9-12" data-i18n="level_9_12">高中</option>
+                                </select>
                             </div>
                             <div>
-                                <label for="num-questions" class="block text-sm font-medium text-gray-700" data-i18n="num_questions_label">題目數量：</label>
-                                <input type="number" id="num-questions" value="5" min="1" max="30" class="mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                <p class="text-xs text-gray-500 mt-1" data-i18n="num_questions_hint">單次最多可生成30題。</p>
+                                <label for="num-questions" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                                    <span data-i18n="num_questions_label">題目數量：</span>
+                                </label>
+                                <input type="number" id="num-questions" value="5" min="1" max="30" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
                             </div>
                             <div>
-                                <label for="format-select" class="block text-sm font-medium text-gray-700" data-i18n="export_format_label">匯出格式：</label>
-                                <select id="format-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="" disabled selected data-i18n="format_select_placeholder">請選擇...</option>
+                                <label for="difficulty-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                                    <span data-i18n="difficulty_label">題目難度：</span>
+                                </label>
+                                <select id="difficulty-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                                    <option value="中等" selected data-i18n="difficulty_medium">中等 (預設)</option> 
+                                    <option value="簡單" data-i18n="difficulty_easy">簡單</option> 
+                                    <option value="困難" data-i18n="difficulty_hard">困難</option>
+                                </select>
+                            </div>
+
+                            <!-- 4. 形式設定矩陣 (Row 2: 方式, 風格, 格式) -->
+                            <div>
+                                <label for="question-type-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                                    <span data-i18n="question_type_label">題目類型：</span>
+                                </label>
+                                <select id="question-type-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                                    <option value="multiple_choice" selected data-i18n="type_multiple_choice">選擇題</option> 
+                                    <option value="true_false" data-i18n="type_true_false">是非題</option> 
+                                    <option value="mixed" data-i18n="type_mixed">是非+選擇題</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="question-style-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                                    <span data-i18n="question_style_label">出題風格：</span>
+                                </label>
+                                <select id="question-style-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                                    <option value="knowledge-recall" selected data-i18n="style_knowledge">知識記憶型 (預設)</option> 
+                                    <option value="competency-based" data-i18n="style_competency">✨ 素養導向型</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="format-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    <span data-i18n="export_format_label">匯出格式</span>
+                                </label>
+                                <select id="format-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                                    <option value="" disabled selected data-i18n="format_placeholder">請選擇格式</option>
                                     <option value="wordwall" data-i18n="format_wordwall">Wordwall (Excel)</option>
                                     <option value="kahoot" data-i18n="format_kahoot">Kahoot (Excel)</option>
                                     <option value="wayground" data-i18n="format_wayground">Wayground (Excel)</option>
@@ -424,48 +573,27 @@
                                     <option value="txt" data-i18n="format_txt">純文字檔 (.txt)</option>
                                 </select>
                             </div>
-                            <div>
-                                <label for="question-type-select" class="block text-sm font-medium text-gray-700" data-i18n="question_type_label">題目類型：</label>
-                                <select id="question-type-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="multiple_choice" selected data-i18n="type_multiple_choice">選擇題</option> 
-                                    <option value="true_false" data-i18n="type_true_false">是非題</option> 
-                                    <option value="mixed" data-i18n="type_mixed">是非+選擇題</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="difficulty-select" class="block text-sm font-medium text-gray-700" data-i18n="difficulty_label">題目難度：</label>
-                                <select id="difficulty-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="中等" selected data-i18n="difficulty_medium">中等 (預設)</option> 
-                                    <option value="簡單" data-i18n="difficulty_easy">簡單</option> 
-                                    <option value="困難" data-i18n="difficulty_hard">困難</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="student-level-select-quiz" class="block text-sm font-medium text-gray-700" data-i18n="level_label">學生程度 (K12)：</label>
-                                <select id="student-level-select-quiz" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 student-level-sync">
-                                    <option value="" disabled selected data-i18n="level_label">請選擇學生程度...</option>
-                                    <option value="1-2" data-i18n="level_1_2">低年級</option> 
-                                    <option value="3-4" data-i18n="level_3_4">中年級</option> 
-                                    <option value="5-6" data-i18n="level_5_6">高年級</option> 
-                                    <option value="7-9" data-i18n="level_7_9">國中</option> 
-                                    <option value="9-12" data-i18n="level_9_12">高中</option>
-                                    <option value="其他" data-i18n="level_other">其他</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="question-style-select" class="block text-sm font-medium text-gray-700" data-i18n="question_style_label">出題風格：</label>
-                                <select id="question-style-select" class="mt-1 block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                                    <option value="knowledge-recall" selected data-i18n="style_knowledge">知識記憶型 (預設)</option> 
-                                    <option value="competency-based" data-i18n="style_competency">✨ 素養導向型</option>
+
+                            <!-- [Phase 4.2] 素養情境選單 (全寬) -->
+                            <div id="competency-context-container" class="hidden sm:col-span-3">
+                                <label for="context-type-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5m1.812-1.812A9 9 0 1111 3.936v.001z" /></svg>
+                                    <span>情境類型</span>
+                                </label>
+                                <select id="context-type-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                                    <option value="personal" selected>個人生活</option>
+                                    <option value="social">社會時事</option>
+                                    <option value="interdisciplinary">跨學科議題</option>
+                                    <option value="academic">學術探究</option>
                                 </select>
                             </div>
 
-                            <!-- 布魯姆進階勾選區 -->
-                            <div class="sm:col-span-2 mt-4">
-                                <button id="toggle-bloom-btn" class="w-full text-sm font-bold text-gray-700 flex items-center justify-start p-1 hover:bg-gray-50 rounded-lg transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                            <!-- 5. 布魯姆自訂認知層次 (全寬) -->
+                            <div class="sm:col-span-3 mt-2">
+                                <button id="toggle-bloom-btn" class="w-full text-sm font-bold text-gray-700 flex items-center justify-start p-1 hover:bg-gray-50 rounded-lg transition-colors outline-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                                     <span data-i18n="tab_bloom">自訂認知層次</span>
-                                    <svg id="bloom-arrow" class="h-4 w-4 ml-2 transition-transform text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
+                                    <svg id="bloom-arrow" class="h-4 w-4 ml-2 transition-transform themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" /></svg>
                                 </button>
                                 <div id="bloom-options-container" class="mt-3 grid grid-cols-3 gap-3 hidden border-t border-gray-100 pt-3">
                                     <label class="flex items-center text-xs cursor-pointer"><input type="checkbox" value="remember" class="bloom-checkbox mr-1"> <span data-i18n="bloom_remember">記憶</span></label>
@@ -477,8 +605,32 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
                              <button id="regenerate-btn" class="hidden themed-button-primary font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center"  >開始出題</button>
+                        </div>
+                    </div>
+
+                    <!-- 專家模式容器 (保持 ID 以維護 JS 連動) -->
+                    <div id="expert-mode-container" class="hidden flex flex-col gap-8">
+                        <div class="themed-card bg-white p-6 rounded-2xl shadow-lg border border-purple-100 relative text-center">
+                            <h3 class="text-xl font-bold mb-6 flex items-center justify-center">
+                                <span class="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center mr-3 text-white">🎓</span>
+                                專家命題工作台
+                            </h3>
+                            <div class="grid grid-cols-3 gap-2 mb-6">
+                                <button class="expert-type-btn active" onclick="window.switchExpertType(this, 'word-definition')">詞語解釋</button>
+                                <button class="expert-type-btn" onclick="window.switchExpertType(this, 'reading-comprehension')">文意理解</button>
+                                <button class="expert-type-btn" onclick="window.switchExpertType(this, 'phonetic-form')">字音字形</button>
+                                <button class="expert-type-btn" onclick="window.switchExpertType(this, 'cloze')">句子挖空</button>
+                                <button class="expert-type-btn" onclick="window.switchExpertType(this, 'sentence-reordering')">句子重組</button>
+                                <button class="expert-type-btn" onclick="window.switchExpertType(this, 'idiom-usage')">成語運用</button>
+                            </div>
+                            <div class="p-6 bg-gray-50 rounded-xl border">
+                                <h4 class="text-lg font-bold mb-2" id="expert-placeholder-title">詞語解釋配對</h4>
+                                <textarea id="expert-text-input" rows="6" class="w-full p-4 border rounded-xl mb-4 focus:ring-2 focus:ring-purple-500 outline-none transition" placeholder="請在此輸入內容..."></textarea>
+                                <button id="expert-generate-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-all active:scale-95">生成專家試題</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -504,11 +656,14 @@
                             <p id="loading-text" class="text-lg font-semibold text-gray-700 text-center" data-i18n="loading_questions">AI 正在為您生成題目...</p>
                         </div>
                         
-                        <div id="preview-placeholder" class="flex-grow flex flex-col items-center justify-center text-center text-gray-400">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                            </svg>
-                            <p class="text-lg font-semibold text-gray-500" data-i18n="preview_placeholder">請在左側提供內容並設定選項</p>
+                        <div id="preview-placeholder" class="flex-grow flex flex-col items-center justify-center text-center text-gray-400 py-20">
+                            <div class="bg-gray-100 p-6 rounded-full mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                </svg>
+                            </div>
+                            <p class="text-lg font-bold text-gray-500 mb-2" data-i18n="preview_placeholder">請在左側提供內容並設定選項</p>
+                            <p class="text-sm text-gray-400 max-w-xs">AI 老師將在這裡為您即時呈現生成的精彩試題</p>
                         </div>
 
                         <!-- 題目列表區 -->
@@ -536,16 +691,13 @@
                         <div id="lib-quiz-list" class="flex-grow"></div>
                     </div>
                 </div>
-
-                </div>
             </main>
 
-            <footer class="text-center mt-2 text-sm text-gray-500" style="padding-bottom: 10px !important;">
+            <footer class="text-center mt-10 py-8 text-sm text-gray-500 border-t border-gray-200">
                 <p>
-                    <span id="version-btn" class="cursor-pointer hover:underline text-indigo-600 font-semibold" data-i18n="footer_version">v9.4 版本修正歷程</span> | 
+                    <span id="version-btn" class="cursor-pointer hover:underline font-bold themed-accent-text">V9.8.4 (2026/01/17)</span> | 
                     <span data-i18n="footer_powered_by">由 Google Gemini 強力驅動</span> | 
-
-                    <a href="https://bit.ly/Aliang" target="_blank" class="themed-accent-text themed-accent-text-hover">ㄚ亮笑長練功坊</a> | 
+                    <a href="https://bit.ly/Aliang" target="_blank" class="themed-accent-text">ㄚ亮笑長練功坊</a> | 
                     <a href="readme.html" target="_blank" class="themed-accent-text themed-accent-text-hover" data-i18n="footer_intro">程式簡介與使用說明</a> |
                     瀏覽人數: <span id="visitor-counter">---</span>
                 </p>
@@ -738,6 +890,6 @@
         </div>
     </template>
 
-    <script src="main.js" type="module"></script>
+    <script src="main.js?v=9.8.2" type="module"></script>
 </body>
 </html>
