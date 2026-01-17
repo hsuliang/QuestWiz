@@ -2,7 +2,7 @@ import * as api from '../api.js';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
-import { handleError } from '../utils.js';
+import { handleError } from '../utils/errorHandler.js'; 
 import { CONFIG } from '../config.js';
 
 /**
@@ -18,13 +18,12 @@ export async function handleAnalyzeContent() {
         return;
     }
 
-    // 2. 金鑰檢查 (修正 key=null 的問題)
+    // 2. 金鑰檢查
     const apiKey = api.getApiKey();
     if (!apiKey) {
         ui.showToast('請先在右上方「設定」中儲存您的 API 金鑰', 'error');
         if (elements.commonSettingsCard) {
-            // 自動展開設定區提醒使用者
-            elements.commonSettingsCard.classList.remove('collapsed');
+            elements.commonSettingsCard.classList.remove('is-collapsed');
         }
         return;
     }
@@ -55,7 +54,7 @@ export async function handleAnalyzeContent() {
         }
     } catch (error) {
         if (error.name === 'AbortError') return;
-        ui.showToast('分析失敗：' + (error.message || '未知錯誤'), 'error');
+        handleError(error, 'AnalyzeContent');
     } finally {
         if (state.isTaskValid('analyze', requestId)) {
             state.endTask('analyze');
@@ -80,14 +79,9 @@ export function updateHighlighter() {
         return;
     }
 
-    // 將關鍵字按長度排序 (由長到短)，防止短詞嵌入長詞導致高亮破碎
     const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
-    
-    // 使用正則表達式進行全域替換 (忽略大小寫，支援多語系)
-    // 這裡我們需要一個暫存機制來防止嵌套替換
     let highlightedText = text;
     
-    // 安全起見，我們先處理 HTML 轉義
     highlightedText = highlightedText
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -95,24 +89,14 @@ export function updateHighlighter() {
 
     sortedKeywords.forEach(word => {
         if (!word.trim()) return;
-        // 轉義正則特殊字元
         const escapedWord = word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        
-        // [Fix] 針對英文關鍵字啟用「單字邊界」判定，防止標記到單字的一部分 (如 run -> running)
-        // 判斷是否全為 ASCII (英文/數字/符號)
-        const isEnglish = /^[\x00-\x7F]+$/.test(word);
+        const isEnglish = /^[\\x00-\\x7F]+$/.test(word);
         const pattern = isEnglish ? `\\b${escapedWord}\\b` : escapedWord;
-        
         const regex = new RegExp(`(${pattern})`, 'gi');
-        
-        // 使用特殊的標記來避免重複替換 (使用不可見字元或自訂標記)
         highlightedText = highlightedText.replace(regex, '<span class="highlight-keyword">$1</span>');
     });
 
-    // 處理換行
     backdrop.innerHTML = highlightedText.replace(/\n/g, '<br>') + (text.endsWith('\n') ? '<br>' : '');
-    
-    // 同步捲動
     syncScroll();
 }
 
@@ -129,24 +113,33 @@ export function syncScroll() {
 }
 
 /**
- * 手動新增自訂關鍵字 (支援參數傳入)
+ * 從選取選單中新增關鍵字
+ */
+export function addKeywordFromSelection() {
+    const menu = document.getElementById('text-selection-menu');
+    if (!menu || !menu.dataset.selectedText) return;
+    
+    handleAddCustomKeyword(menu.dataset.selectedText);
+    hideSelectionMenu();
+}
+
+/**
+ * 手動新增自訂關鍵字
  */
 export function handleAddCustomKeyword(providedText = null) {
     const input = elements.customKeywordInput;
-    // 關鍵修正：判斷傳入的是否為純文字字串
     const textToUse = (typeof providedText === 'string') ? providedText : (input ? input.value : '');
     const word = textToUse.trim();
     
     if (!word) return;
     if (state.getSelectedKeywords().includes(word)) return;
     
-    // 如果是選取文字產生的，隱藏選單
     hideSelectionMenu();
 
-    elements.keywordContainer.appendChild(createKeywordTag(word, true));
+    if (elements.keywordContainer) {
+        elements.keywordContainer.appendChild(createKeywordTag(word, true));
+    }
     state.toggleKeyword(word);
-    
-    // 更新高亮
     updateHighlighter();
     
     if (input && typeof providedText !== 'string') {
@@ -166,14 +159,9 @@ export function handleSelectionChange(e) {
     const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd).trim();
 
     if (selectedText && selectedText.length > 0 && selectedText.length < 50) {
-        // 計算選單位置 (簡化版：出現在滑鼠點擊位置附近)
-        const rect = textarea.getBoundingClientRect();
-        // 我們使用滑鼠事件的座標
         menu.style.left = `${e.clientX}px`;
         menu.style.top = `${e.clientY - 40}px`; 
         menu.classList.remove('hidden');
-        
-        // 儲存選取的文字供按鈕使用
         menu.dataset.selectedText = selectedText;
     } else {
         hideSelectionMenu();
@@ -186,13 +174,11 @@ export function hideSelectionMenu() {
 }
 
 /**
- * 向 AI 請求關鍵字分析 (傳入已驗證的 apiKey)
+ * 向 AI 請求關鍵字分析
  */
 async function requestKeywordAnalysis(text, images, apiKey, signal) {
     const prompt = `你是一位專業的教育診斷專家。請閱讀以下提供的教學內容或圖片，並提取出 5 到 10 個最適合用來「命題」的關鍵字或核心考點（實體名詞、專業術語或重要概念）。
     請嚴格以 JSON 格式回傳： { "keywords": ["重點1", "重點2", ...] }。只需輸出純 JSON，不要有任何解釋文字。`;
-
-    const apiUrl = `${CONFIG.BASE_URL}/models/${CONFIG.MODEL_NAME}:generateContent?key=${apiKey}`;
 
     const taskParts = [{ text: prompt }];
     if (text) taskParts.push({ text: `內容如下：\n${text.substring(0, 3000)}` });
@@ -200,25 +186,30 @@ async function requestKeywordAnalysis(text, images, apiKey, signal) {
         taskParts.push({ inline_data: { mime_type: img.type, data: img.data } });
     });
 
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            "contents": [{ "role": "user", "parts": taskParts }],
-            "generationConfig": { "temperature": 0.2, "responseMimeType": "application/json" }
-        }),
-        signal
-    });
+    // [New] 讀取模型設定
+    const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
+    const isHighQuality = savedModel === 'high-quality';
+    const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
 
-    if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || 'API 請求失敗');
-    }
+    const payload = {
+        "contents": [{ "role": "user", "parts": taskParts }],
+        "generationConfig": { "temperature": 0.2, "responseMimeType": "application/json" }
+    };
+
+    // [Refactor] 使用中央化請求 (支援多金鑰與統一錯誤處理)
+    const data = await api.makeCentralizedRequest(payload, signal, modelName);
     
-    const data = await response.json();
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(rawText.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
-    return parsed.keywords || [];
+    if (!rawText) return [];
+    
+    try {
+        const cleanJson = rawText.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+        const parsed = JSON.parse(cleanJson);
+        return parsed.keywords || [];
+    } catch (e) {
+        console.error('JSON 解析失敗:', rawText);
+        return [];
+    }
 }
 
 function createKeywordTag(word, isAutoSelected = false) {

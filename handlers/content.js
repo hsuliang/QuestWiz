@@ -1,10 +1,12 @@
 import { QUESTION_STYLE } from '../constants.js';
 import { CONFIG, contentLoadingMessages } from '../config.js';
 import * as ui from '../ui.js';
-import { getApiKey, fetchWithRetry } from '../api.js';
+import { getApiKey, fetchWithRetry, makeCentralizedRequest } from '../api.js';
 import { elements } from '../dom.js';
 import { getContentSystemInstruction } from '../prompts/index.js';
+import { getAdaptiveRules } from '../prompts/adaptive_matrix.js'; // [v11.0]
 import { isEnglish } from '../utils.js';
+import { handleError } from '../utils/errorHandler.js';
 import { saveInputDraft, triggerOrUpdate } from './session.js';
 
 // Helper for dynamic script loading
@@ -40,9 +42,18 @@ export function buildContentPrompt() {
     const studentLevel = elements.studentLevelSelectContent ? elements.studentLevelSelectContent.value : (elements.studentLevelSelect ? elements.studentLevelSelect.value : '1-2');
     const studentGradeText = elements.studentLevelSelect && elements.studentLevelSelect.selectedIndex >= 0 ? elements.studentLevelSelect.options[elements.studentLevelSelect.selectedIndex].text : studentLevel;
     
+    // [v11.0] 取得適性化規則
+    const adaptiveRules = getAdaptiveRules(studentLevel);
+
     const learningObjectives = elements.learningObjectivesInput ? elements.learningObjectivesInput.value : '';
     const wordCountMap = { '1-2': 200, '3-4': 400, '5-6': 600, '7-9': 800, '9-12': 1000 };
-    const wordCount = wordCountMap[studentLevel] || 500;
+    let wordCount = wordCountMap[studentLevel] || 500;
+    
+    // [Phase 2] 適性化字數覆寫 (Adaptive Override)
+    if (elements.adaptiveWordCount && elements.adaptiveWordCount.value) {
+        wordCount = parseInt(elements.adaptiveWordCount.value, 10);
+    }
+
     const interfaceLanguage = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
     const isTargetEnglish = isEnglish(topic);
     const outputLangMode = elements.outputLangSelect ? elements.outputLangSelect.value : 'auto';
@@ -69,16 +80,12 @@ export function buildContentPrompt() {
         learningObjectives,
         interfaceLanguage,
         isTargetEnglish,
-        languageInstruction
+        languageInstruction,
+        adaptiveRules // [v11.0] 注入規則
     });
 }
 
 export async function callGeminiForContent(promptString) {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        return ui.showToast(ui.t('error_api_missing'), 'error');
-    }
-
     const btn = elements.generateContentBtn;
     const originalContent = btn ? btn.innerHTML : '';
     
@@ -95,42 +102,88 @@ export async function callGeminiForContent(promptString) {
     }, 2500); 
     
     try {
-        const requestBody = {
+        // [New] 讀取模型設定
+        const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
+        const isHighQuality = savedModel === 'high-quality';
+        const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
+
+        console.log('[Content] Model Selection:', { savedModel, isHighQuality, modelName });
+
+        const genConfig = { "temperature": isHighQuality ? 0.4 : 0.7, "maxOutputTokens": 8192, "responseMimeType": "application/json" };
+        if (isHighQuality) { // [New] 如果是高品質模式，嘗試啟用 thinking
+             // 注意：內文生成可能不需要嚴格的 thinking，但如果用 v3 模型，參數要對應
+             // 若 v3 支援 thinking，則加入
+             genConfig.thinking = true;
+             genConfig.include_thoughts = false;
+        }
+
+        const payload = {
             "contents": [{"parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }] }],
             "systemInstruction": {
                 "parts": [{ "text": promptString }]
-            }
+            },
+            "generationConfig": genConfig // [New] 傳入動態組態
         };
 
-        const apiUrl = `${CONFIG.BASE_URL}/models/${CONFIG.MODEL_NAME}:generateContent`;
-
-        const response = await fetchWithRetry(apiUrl, { 
-            method: 'POST', 
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey
-            }, 
-            body: JSON.stringify(requestBody) 
-        });
-        
-        if (!response.ok) {
-             const errorBody = await response.json().catch(() => ({ error: { message: '無法讀取錯誤內容' } }));
-             throw new Error(`API 請求失敗: ${response.status} - ${errorBody.error.message}`);
-        }
-        
-        const result = await response.json();
-        const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        // [Refactor] 使用中央化請求 (支援多金鑰與統一錯誤處理)並指定模型
+        const result = await makeCentralizedRequest(payload, null, modelName);
+        let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (rawText) {
-            let generatedText = rawText;
+            let generatedText = rawText.trim();
             
-            if (rawText.includes('TITLE:')) {
-                const parts = rawText.split('TITLE:');
+            // [New Fix] 預防性檢查：如果 AI 回傳了 JSON 格式
+            if (generatedText.startsWith('{') && generatedText.endsWith('}')) {
+                try {
+                    const parsed = JSON.parse(generatedText);
+                    
+                    // 智慧提取主文 (處理 v11.0 新結構：learning_content 與 keywords)
+                    let contentRaw = parsed.learning_content || parsed.content || parsed.article || parsed.text || parsed.body;
+                    
+                    if (contentRaw) {
+                        if (Array.isArray(contentRaw)) {
+                            // 處理陣列：可能是 ["段落1"] 或 [{content: "..."}] 或 [{text: "..."}]
+                            generatedText = contentRaw.map(item => {
+                                if (typeof item === 'string') return item;
+                                return item.content || item.text || JSON.stringify(item);
+                            }).join('\n\n');
+                        } else if (typeof contentRaw === 'object') {
+                            generatedText = contentRaw.text || contentRaw.content || contentRaw.body || JSON.stringify(contentRaw, null, 2);
+                        } else {
+                            generatedText = String(contentRaw);
+                        }
+                    } else {
+                        const displayObj = { ...parsed };
+                        delete displayObj.title;
+                        delete displayObj.quizTitle;
+                        delete displayObj.keywords; // 移除 keywords 以免干擾正文顯示
+                        generatedText = JSON.stringify(displayObj, null, 2);
+                    }
+
+                    // [v11.0 New] 自動同步關鍵字至系統
+                    if (parsed.keywords && Array.isArray(parsed.keywords)) {
+                        import('../state.js').then(state => {
+                            state.setSelectedKeywords(parsed.keywords);
+                            ui.showToast('AI 已自動建議考點關鍵字', 'info');
+                        });
+                    }
+
+                    // 如果有標題，也順便更新
+                    if (parsed.title && elements.quizTitleInput) {
+                        elements.quizTitleInput.value = parsed.title;
+                    }
+                } catch (e) { 
+                    console.warn('[Content] JSON parse failed, using raw text:', e);
+                }
+            }
+            
+            if (generatedText.includes('TITLE:')) {
+                const parts = generatedText.split('TITLE:');
                 const titlePart = parts[1].split('\n')[0].trim();
                 if (elements.quizTitleInput) {
                     elements.quizTitleInput.value = titlePart;
                 }
-                generatedText = rawText.replace(/TITLE:.*?\n/, '').trim();
+                generatedText = generatedText.replace(/TITLE:.*?\n/, '').trim();
             }
 
             if(elements.textInput) {
@@ -150,7 +203,7 @@ export async function callGeminiForContent(promptString) {
         }
     } catch (error) {
         console.error('生成內文時發生錯誤:', error);
-        ui.showToast(error.message, 'error');
+        handleError(error, 'GenerateContent');
     } finally {
         clearInterval(loaderInterval); 
         ui.hideLoader();
@@ -236,7 +289,8 @@ export function handleDownloadTxt() {
     const title = elements.quizTitleInput ? elements.quizTitleInput.value.trim() : '';
     const topic = elements.topicInput ? elements.topicInput.value.trim() : '';
     const baseName = title || topic || '學習內文';
-    const safeName = baseName.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20);
+    // [Fix] 放寬檔名長度限制至 100 字元
+    const safeName = baseName.replace(/[\\/:*?"<>|]/g, '_').substring(0, 100);
 
     const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -350,6 +404,11 @@ export async function handleExtractFromUrl() {
 
         const result = await response.json();
         
+        // [Fix] 自動將網頁標題填入試卷標題欄位，方便下載時作為檔名
+        if (result.title && elements.quizTitleInput) {
+            elements.quizTitleInput.value = result.title.trim();
+        }
+        
         let fullText;
         if (isYouTube) {
             fullText = result.transcript;
@@ -357,11 +416,13 @@ export async function handleExtractFromUrl() {
             // 針對網頁內容，使用 Gemini 進行二次清洗
             ui.showLoader("AI 正在智慧去雜訊與提取主文...");
             
-            const rawContent = result.content; // 這裡是 Jina 回傳的 Markdown
+            const rawContent = result.content; 
             const cleaningPrompt = `
 你是一位專業的內容編輯。請處理以下從網頁擷取的 Markdown 內容：
 
 **目標**：去除所有導覽列、側邊欄、廣告、頁尾、版權宣告以及「其他人也在看」、「熱門新聞」這類不相關的推薦連結列表。只保留**核心文章的標題**與**正文內容**。
+
+**重要提示**：如果輸入內容是 JSON 格式（例如包含 "content": ...），請只提取並清洗 content 裡面的文字，絕對不要輸出 JSON 括號或鍵名。
 
 **輸入內容**：
 ${rawContent.substring(0, 30000)} 
@@ -370,43 +431,43 @@ ${rawContent.substring(0, 30000)}
 **輸出要求**：
 1. 直接回傳乾淨的文章標題與內文。
 2. 保持 Markdown 格式（如標題用 #, 段落用空行）。
-3. 不要包含任何解釋性文字（如「好的，這是結果...」）。
-4. 如果有多篇新聞混雜，只保留最核心、篇幅最長的那一篇。
+3. 不要包含任何解釋性文字。
+4. 輸出必須是純文字，嚴禁輸出 JSON 格式。
 `;
 
-            const apiKey = getApiKey();
-            if (apiKey) {
-                try {
-                     const cleanResponse = await fetchWithRetry(`${CONFIG.BASE_URL}/models/${CONFIG.MODEL_NAME}:generateContent`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-goog-api-key': apiKey
-                        },
-                        body: JSON.stringify({
-                            "contents": [{ "parts": [{ "text": cleaningPrompt }] }]
-                        })
-                    });
-                    
-                    if (cleanResponse.ok) {
-                        const cleanResult = await cleanResponse.json();
-                        const cleanedText = cleanResult.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (cleanedText) {
-                            fullText = cleanedText.trim();
-                        } else {
-                            // 若 AI 清洗失敗，回退到原始內容
-                             fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
-                        }
-                    } else {
-                         // 若 API 呼叫失敗，回退到原始內容
-                         fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+            try {
+                // [New] 讀取模型設定
+                const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
+                const isHighQuality = savedModel === 'high-quality';
+                const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
+
+                // [Refactor] 使用中央化請求進行清洗
+                const payload = {
+                    "contents": [{ "parts": [{ "text": cleaningPrompt }] }]
+                };
+                
+                const cleanResult = await makeCentralizedRequest(payload, null, modelName);
+                let cleanedText = cleanResult.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (cleanedText) {
+                    // [Fix] 額外檢查：如果 AI 回傳了 JSON，嘗試解析並提取內容
+                    cleanedText = cleanedText.trim();
+                    if (cleanedText.startsWith('{') && cleanedText.endsWith('}')) {
+                        try {
+                            const parsed = JSON.parse(cleanedText);
+                            // 優先取 content，沒有則取 title + content，再沒有就轉字串
+                            cleanedText = parsed.content || (parsed.title ? `# ${parsed.title}\n\n${parsed.content || ''}` : JSON.stringify(parsed));
+                        } catch (e) { /* 不是標準 JSON，忽略 */ }
                     }
-                } catch (e) {
-                    console.warn("AI 清洗失敗，使用原始內容:", e);
-                    fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+                    fullText = cleanedText;
+                } else {
+                    throw new Error('AI 回傳為空');
                 }
-            } else {
-                 fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
+            } catch (e) {
+                console.warn("AI 清洗失敗，使用原始內容:", e);
+                // 這裡我們不 throw，而是降級使用原始內容，但會顯示 Toast 告知使用者
+                handleError(e, 'AICleaningWarning'); 
+                fullText = `${ui.t('extracted_title_label')}${result.title}\n\n${ui.t('extracted_content_label')}\n${result.content}`;
             }
         }
         
@@ -424,7 +485,7 @@ ${rawContent.substring(0, 30000)}
 
     } catch (error) {
         console.error('擷取內容失敗:', error);
-        ui.showToast(error.message, 'error');
+        handleError(error, 'ExtractContent');
     } finally {
         ui.hideLoader();
         if (btn) {

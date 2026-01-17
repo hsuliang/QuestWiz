@@ -124,10 +124,11 @@ export function checkContentAndToggleButton() {
 export function triggerOrUpdate() { checkContentAndToggleButton(); }
 
 /**
- * 清除所有內容並回到初始狀態
+ * [Modified] 清除素材與內容 (保留設定)
+ * 對應按鈕：左側「清除所有內容」
  */
-export function clearAllInputs() {
-    // 1. 清空所有輸入框
+export function clearContent(showToast = true) {
+    // 1. 清空素材輸入框
     if(elements.textInput) elements.textInput.value = ''; 
     if(elements.fileInput) elements.fileInput.value = ''; 
     if(elements.fileNameDisplay) elements.fileNameDisplay.textContent = ''; 
@@ -148,42 +149,83 @@ export function clearAllInputs() {
     if(elements.downloadTxtBtn) elements.downloadTxtBtn.classList.add('hidden');
     if(elements.shareContentBtn) elements.shareContentBtn.classList.add('hidden');
     
-    // 4. 重置 AI 生成設定
-    if(elements.topicInput) elements.topicInput.value = ''; 
-    if(elements.textTypeSelect) elements.textTypeSelect.value = '科普說明文';
-    if(elements.customTextTypeInput) { elements.customTextTypeInput.value = ''; elements.customTextTypeInput.classList.add('hidden'); }
-    if(elements.learningObjectivesInput) elements.learningObjectivesInput.value = '';
-    if(elements.toneSelect) elements.toneSelect.value = '客觀中立';
-    if(elements.customToneInput) { elements.customToneInput.value = ''; elements.customToneInput.classList.add('hidden'); }
-    if(elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = false;
-    
-    // 5. 重置題目設定
-    if(elements.quizTitleInput) elements.quizTitleInput.value = ''; 
-    if(elements.studentLevelSelects) elements.studentLevelSelects.forEach(s => { if(s) s.value = ''; }); 
-    else if(elements.studentLevelSelect) elements.studentLevelSelect.value = '';
-    if(elements.questionStyleSelect) elements.questionStyleSelect.value = QUESTION_STYLE.KNOWLEDGE_RECALL;
-    if(elements.formatSelect) elements.formatSelect.value = ''; 
-
-    // 6. 清除已生成題目與摘要
+    // 4. 清除已生成題目與摘要 (避免素材與題目不符)
     state.setGeneratedQuestions([]);
-    ui.renderQuestionsForEditing([]); // 這會清空列表與操作按鈕
+    ui.renderQuestionsForEditing([]); 
     
-    // [Fix] 強制清空摘要容器
     const summaryContainer = document.getElementById('quiz-summary-container');
     if (summaryContainer) summaryContainer.innerHTML = '';
 
-    // 7. 顯示 Placeholder
+    // 5. 顯示 Placeholder
     if(elements.previewPlaceholder) {
         elements.previewPlaceholder.classList.remove('hidden');
         if(elements.previewPlaceholder.parentElement) elements.previewPlaceholder.parentElement.classList.remove('hidden');
     }
     
-    // 8. 清除儲存
+    // 6. 清除草稿紀錄
     localStorage.removeItem(DRAFT_INPUTS_KEY); 
     state.clearDraftState(); 
     
-    // 9. 更新 UI 狀態
+    // 7. 更新 UI
     checkContentAndToggleButton(); 
     ui.switchWorkTab('edit');
-    ui.showToast(ui.t('toast_cleared'), 'success');
+    
+    if (showToast) ui.showToast('內容與題目已清空', 'success');
+}
+
+/**
+ * [New] 深層重置 (Factory Reset)
+ * 對應按鈕：右側「重置」
+ */
+export function hardReset() {
+    // 先清空內容
+    clearContent(false);
+
+    // 重置所有設定至預設值 (回到 Placeholder 狀態)
+    if(elements.topicInput) elements.topicInput.value = ''; 
+    
+    // [Fix] 重置為空字串，顯示 Placeholder
+    if(elements.textTypeSelect) elements.textTypeSelect.value = ''; 
+    if(elements.customTextTypeInput) { elements.customTextTypeInput.value = ''; elements.customTextTypeInput.classList.add('hidden'); }
+    
+    if(elements.learningObjectivesInput) elements.learningObjectivesInput.value = '';
+    
+    // [Fix] 重置為空字串，顯示 Placeholder
+    if(elements.toneSelect) elements.toneSelect.value = ''; 
+    if(elements.customToneInput) { elements.customToneInput.value = ''; elements.customToneInput.classList.add('hidden'); }
+    
+    if(elements.competencyBasedCheckbox) elements.competencyBasedCheckbox.checked = false;
+    
+    // 重置題目設定
+    if(elements.quizTitleInput) elements.quizTitleInput.value = ''; 
+    
+    // 處理連動的學生程度選單
+    const levelSelects = document.querySelectorAll('.student-level-sync');
+    levelSelects.forEach(s => s.value = '');
+
+    // [Fix] 處理學習領域選單 (AI卡片 & 題目卡片)
+    const domainSelects = document.querySelectorAll('.domain-sync, #domain-select-content, #domain-select-quiz');
+    domainSelects.forEach(s => s.value = '');
+
+    if(elements.questionStyleSelect) elements.questionStyleSelect.value = QUESTION_STYLE.KNOWLEDGE_RECALL;
+    if(elements.difficultySelect) elements.difficultySelect.value = '中等';
+    if(elements.numQuestionsInput) elements.numQuestionsInput.value = '5';
+    if(elements.questionTypeSelect) elements.questionTypeSelect.value = 'multiple_choice';
+    if(elements.formatSelect) elements.formatSelect.value = ''; 
+
+    // 重置滑桿 (如果有的話)
+    const wordSlider = document.getElementById('word-count-slider');
+    if (wordSlider) {
+        wordSlider.value = 500; // 假設預設值
+        wordSlider.dispatchEvent(new Event('input')); // 觸發更新
+    }
+
+    ui.showToast('已重置所有設定與內容', 'success');
+}
+
+/**
+ * 相容性介面
+ */
+export function clearAllInputs() {
+    hardReset();
 }

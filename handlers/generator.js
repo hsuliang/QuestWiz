@@ -1,7 +1,9 @@
 import { generateSingleBatch } from '../api.js';
+import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
-import { isEnglish, handleError } from '../utils.js';
+import { isEnglish } from '../utils.js';
+import { handleError } from '../utils/errorHandler.js'; // [Fix] Separate import
 import { normalizeQuestions } from '../utils/normalizer.js';
 import { QUESTION_STYLE, DIFFICULTY, BLOOM_LEVELS } from '../constants.js';
 
@@ -77,30 +79,83 @@ export async function triggerQuestionGeneration() {
     const uploadedImages = state.getUploadedImages();
     
     if (!text.trim() && uploadedImages.length === 0) {
-        alert('請先提供內容或上傳圖片！');
+        ui.showToast('請先提供內容或上傳圖片！', 'error');
         return;
     }
 
+    if (!elements.studentLevelSelect.value) {
+        ui.showToast('請先選擇學生程度', 'error');
+        return;
+    }
+
+    // [New] 偵測模式
+    const expertSettings = document.getElementById('expert-mode-settings');
+    const isExpertMode = expertSettings && !expertSettings.classList.contains('hidden');
     const totalQuestions = parseInt(elements.numQuestionsInput.value, 10) || 5;
+    const selectedKeywords = state.getSelectedKeywords();
+
+    console.log(`[Generator] ExpertMode: ${isExpertMode}, Keywords: ${selectedKeywords.length}, TotalQs: ${totalQuestions}`);
+
+    // [恢復] 重點數量檢查
+    if (selectedKeywords.length > totalQuestions) {
+        console.log('[Generator] Keywords exceed questions, asking for confirmation...');
+        const proceed = confirm(`您選取了 ${selectedKeywords.length} 個重點，但設定只出 ${totalQuestions} 題。建議增加題數，否則部分重點將被隨機忽略。是否繼續？`);
+        if (!proceed) {
+            console.log('[Generator] User cancelled keyword warning.');
+            return;
+        }
+    }
+    
     const settings = {
+        isExpertMode,
         totalQuestions,
-        questionType: elements.questionTypeSelect.value,
         difficulty: elements.difficultySelect.value,
-        questionStyle: elements.questionStyleSelect.value,
         studentLevel: elements.studentLevelSelect.value,
         text,
         uploadedImages,
-        selectedKeywords: state.getSelectedKeywords(),
-        userSelectedLevels: Array.from(elements.bloomLevelCheckboxes).filter(cb => cb.checked).map(cb => cb.value)
+        selectedKeywords,
+        languageChoice: 'chinese', // 預設值
+        // [Phase 4.3] 注入領域與情境參數
+        domain: elements.domainSelectQuiz ? elements.domainSelectQuiz.value : 'chinese',
+        contextType: elements.contextTypeSelect ? elements.contextTypeSelect.value : ''
     };
 
-    let languageChoice = 'chinese';
-    if (isEnglish(text)) {
-        // 這邊暫時略過複雜的選取，直接預設中文出題以確保流程不中斷
-        languageChoice = 'chinese';
-    }
-    settings.languageChoice = languageChoice;
+    // [恢復] 語言偵測邏輯
+    const isEng = isEnglish(text);
+    console.log(`[Generator] Language detection - isEnglish: ${isEng}`);
 
+    if (!isExpertMode && isEng) {
+        console.log('[Generator] Prompting for language choice...');
+        try {
+            settings.languageChoice = await ui.askForLanguageChoice();
+            console.log(`[Generator] User selected language: ${settings.languageChoice}`);
+        } catch (e) {
+            console.log('[Generator] Language choice cancelled or failed:', e);
+            return;
+        }
+    } else {
+        console.log('[Generator] Skipping language choice (Not English or Expert Mode)');
+    }
+
+    if (isExpertMode) {
+        // 抓取專家模式設定
+        settings.subject = document.querySelector('input[name="expert-subject"]:checked')?.value || 'chinese';
+        settings.expertTypes = Array.from(document.querySelectorAll('.expert-checkbox:checked')).map(cb => cb.value);
+        
+        if (settings.expertTypes.length === 0) {
+            ui.showToast('請至少勾選一種專家題型！', 'error');
+            return;
+        }
+        settings.languageChoice = 'chinese'; // 語文專家模式強制中文
+    } else {
+        // 通用模式設定
+        settings.questionType = elements.questionTypeSelect.value;
+        settings.questionStyle = elements.questionStyleSelect.value;
+        settings.userSelectedLevels = Array.from(elements.bloomLevelCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+    }
+
+    // [Fix] 立即切換到編輯分頁顯示 Loader
+    ui.switchWorkTab('edit');
     await proceedWithGeneration(settings);
 }
 
@@ -111,6 +166,17 @@ async function proceedWithGeneration(settings) {
     console.log('[Generator] proceedWithGeneration started');
     const { requestId, signal } = state.startTask('generate');
     
+    // [New] 讀取模型設定
+    const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
+    const isHighQuality = savedModel === 'high-quality';
+
+    if (isHighQuality) {
+        ui.showLoader("Gemini 3 深度思考中... (這可能需要一點時間)");
+        ui.showToast('正在使用 Gemini 3 預覽版進行深度推理', 'info');
+    } else {
+        ui.showLoader("AI 正在光速生成題目...");
+    }
+
     // 清空舊資料，觸發響應式 UI 清空預覽
     state.setGeneratedQuestions([]);
     state.setQuizSummary(null);
@@ -126,13 +192,14 @@ async function proceedWithGeneration(settings) {
                 if (signal.aborted || !state.isTaskValid('generate', requestId)) return;
                 
                 const batchSize = Math.min(count, 5);
-                console.log(`[Generator] Requesting batch of ${batchSize} for level ${level}`);
+                console.log(`[Generator] Requesting batch of ${batchSize} for level ${level} (HighQuality: ${isHighQuality})`);
                 
                 const result = await generateSingleBatch(
                     batchSize, settings.questionType, settings.difficulty, 
                     settings.text, settings.uploadedImages, settings.questionStyle, 
                     signal, settings.languageChoice, settings.studentLevel, 
-                    level, settings.selectedKeywords
+                    level, settings.selectedKeywords, settings, isHighQuality,
+                    settings.domain, settings.contextType
                 );
                 
                 if (result && result.questions) {
@@ -159,6 +226,7 @@ async function proceedWithGeneration(settings) {
             distribution: bloomDistribution,
             isAutoGenerated: settings.userSelectedLevels.length === 0
         });
+        ui.switchWorkTab('edit'); // 自動切回編輯分頁
 
     } catch (error) {
         console.error('[Generator] Error during generation:', error);
