@@ -4,14 +4,27 @@ import * as state from '../state.js';
 /**
  * 顯示提示訊息 (Toast)
  */
+let toastTimeout; // [Fix] 追蹤 Timeout ID
+
 export function showToast(message, type = 'success') {
-    if (document.getElementById('toast') && document.getElementById('toast-message')) {
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+    if (toast && toastMessage) {
+        // 清除之前的定時器，防止提早關閉
+        if (toastTimeout) clearTimeout(toastTimeout);
+
         toastMessage.textContent = message;
-        toast.className = `fixed bottom-5 right-5 text-white py-2 px-5 rounded-lg shadow-xl opacity-0 transition-opacity duration-300 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
-        toast.classList.remove('opacity-0');
-        setTimeout(() => { toast.classList.add('opacity-0'); }, 4000);
+        // Reset classes
+        toast.className = `fixed top-10 left-1/2 -translate-x-1/2 text-white py-3 px-8 rounded-2xl shadow-2xl transition-all duration-300 z-[100] font-bold flex items-center gap-2 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+        
+        // Show with animation
+        toast.classList.remove('opacity-0', '-translate-y-4');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        
+        toastTimeout = setTimeout(() => { 
+            toast.classList.add('opacity-0', '-translate-y-4');
+            toast.classList.remove('opacity-100', 'translate-y-0');
+        }, 3000); // 錯誤訊息可以顯示久一點嗎？目前統一 3 秒
     }
 }
 
