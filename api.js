@@ -11,7 +11,7 @@ const modelCache = new Map();
 const FALLBACK_MODEL = 'gemini-flash-latest';
 
 // 瀏覽器環境下，因 Google /models 列表 API 不支援 CORS，此清單作為穩健的本地保底階梯
-const BROWSER_FALLBACK_LIST = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+const BROWSER_FALLBACK_LIST = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
 
 /**
  * 解析特定 API Key 可用的所有 Flash 模型，並按版本從新到舊排序
