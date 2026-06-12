@@ -10,6 +10,9 @@ const modelCache = new Map();
 // 當完全無法取得模型清單時的最後保險版本（官方常綠別名）
 const FALLBACK_MODEL = 'gemini-flash-latest';
 
+// 瀏覽器環境下，因 Google /models 列表 API 不支援 CORS，此清單作為穩健的本地保底階梯
+const BROWSER_FALLBACK_LIST = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+
 /**
  * 解析特定 API Key 可用的所有 Flash 模型，並按版本從新到舊排序
  * @param {string} apiKey - Gemini API Key
@@ -18,7 +21,7 @@ const FALLBACK_MODEL = 'gemini-flash-latest';
  */
 export async function resolveFlashModelsList(apiKey, throwOnError = false) {
     if (!apiKey) {
-        return [FALLBACK_MODEL];
+        return [...BROWSER_FALLBACK_LIST];
     }
     
     if (modelCache.has(apiKey)) {
@@ -47,7 +50,7 @@ export async function resolveFlashModelsList(apiKey, throwOnError = false) {
         });
 
         if (flashModels.length === 0) {
-            return [FALLBACK_MODEL];
+            return [...BROWSER_FALLBACK_LIST];
         }
 
         // 2. 解析版本號：提取 'gemini-X.Y-flash' 中的 X.Y 數字
@@ -79,9 +82,9 @@ export async function resolveFlashModelsList(apiKey, throwOnError = false) {
         modelCache.set(apiKey, list);
         return list;
     } catch (e) {
-        console.warn("[系統警告] 動態模型解析失敗，已啟用動態常綠降級方案:", FALLBACK_MODEL, e);
+        console.warn("[系統警告] 動態模型解析失敗 (可能因瀏覽器 CORS 限制)，已啟用本地保底階梯方案:", e);
         if (throwOnError) throw e;
-        return [FALLBACK_MODEL];
+        return [...BROWSER_FALLBACK_LIST];
     }
 }
 
@@ -96,6 +99,33 @@ export async function resolveLatestFlashModel(apiKey, throwOnError = false) {
         if (throwOnError) throw e;
         return FALLBACK_MODEL;
     }
+}
+
+/**
+ * 驗證金鑰是否可用 (使用支援 CORS 的 countTokens 輕量端點)
+ * @param {string} apiKey 
+ * @returns {Promise<boolean>}
+ */
+export async function validateApiKey(apiKey) {
+    if (!apiKey) throw new Error('API key is empty');
+    
+    const apiUrl = `${CONFIG.BASE_URL}/models/gemini-1.5-flash:countTokens?key=${apiKey}`;
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: 'ping' }] }]
+        })
+    });
+    
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error?.message || `HTTP ${response.status}`);
+    }
+
+    // 驗證成功後，為其預熱快取，避免常規出題時再發送會被 CORS 阻擋的 models 請求
+    modelCache.set(apiKey, [...BROWSER_FALLBACK_LIST]);
+    return true;
 }
 
 

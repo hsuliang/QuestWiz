@@ -185,9 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ui.showLoader('正在驗證金鑰可用性...');
             try {
-                // 並行呼叫探針以驗證金鑰是否正常
+                // 並行呼叫探針以驗證金鑰是否正常 (使用支援 CORS 的 countTokens 端點)
                 const validationPromises = keys.map(async (key) => {
-                    await api.resolveLatestFlashModel(key, true);
+                    await api.validateApiKey(key);
                     return key;
                 });
 
