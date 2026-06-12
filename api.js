@@ -109,23 +109,24 @@ export async function resolveLatestFlashModel(apiKey, throwOnError = false) {
 export async function validateApiKey(apiKey) {
     if (!apiKey) throw new Error('API key is empty');
     
-    const apiUrl = `${CONFIG.BASE_URL}/models/gemini-1.5-flash:countTokens?key=${apiKey}`;
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: 'ping' }] }]
-        })
-    });
-    
-    if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.error?.message || `HTTP ${response.status}`);
+    const apiUrl = `${CONFIG.BASE_URL}/models/gemini-1.5-flash?key=${apiKey}`;
+    try {
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(`INVALID_KEY: ${errorBody.error?.message || `HTTP ${response.status}`}`);
+        }
+        
+        // 驗證成功後，為其預熱快取，避免常規出題時再發送會被 CORS 阻擋的 models 請求
+        modelCache.set(apiKey, [...BROWSER_FALLBACK_LIST]);
+        return true;
+    } catch (e) {
+        if (e.message && e.message.startsWith('INVALID_KEY:')) {
+            throw e;
+        }
+        throw new Error(`NETWORK_ERROR: ${e.message}`);
     }
-
-    // 驗證成功後，為其預熱快取，避免常規出題時再發送會被 CORS 阻擋的 models 請求
-    modelCache.set(apiKey, [...BROWSER_FALLBACK_LIST]);
-    return true;
 }
 
 

@@ -185,40 +185,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ui.showLoader('正在驗證金鑰可用性...');
             try {
-                // 並行呼叫探針以驗證金鑰是否正常 (使用支援 CORS 的 countTokens 端點)
+                // 並行呼叫探針以驗證金鑰是否正常
                 const validationPromises = keys.map(async (key) => {
                     await api.validateApiKey(key);
                     return key;
                 });
 
                 const results = await Promise.allSettled(validationPromises);
-                const validKeys = results
-                    .filter(r => r.status === 'fulfilled')
-                    .map(r => r.value);
+                
+                const validKeys = [];
+                const networkFailedKeys = [];
+                const invalidKeys = [];
 
-                if (validKeys.length === 0) {
-                    ui.showToast('所有輸入的金鑰均無效或已耗盡額度！儲存已被攔截。', 'error');
+                results.forEach((r, idx) => {
+                    const key = keys[idx];
+                    if (r.status === 'fulfilled') {
+                        validKeys.push(r.value);
+                    } else {
+                        const errMsg = r.reason?.message || '';
+                        if (errMsg.includes('NETWORK_ERROR:')) {
+                            networkFailedKeys.push(key);
+                        } else {
+                            invalidKeys.push(key);
+                        }
+                    }
+                });
+
+                // 狀況一：有部分金鑰成功通過驗證
+                if (validKeys.length > 0) {
+                    const expires = Date.now() + (2 * 60 * 60 * 1000);
+                    const storageData = { value: validKeys, expires, isMulti: validKeys.length > 1 };
+                    sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
+
+                    if (elements.apiKeyInput) {
+                        elements.apiKeyInput.value = validKeys.join('\n');
+                    }
+
+                    const excludedCount = keys.length - validKeys.length;
+                    if (excludedCount > 0) {
+                        ui.showToast(`已成功儲存 ${validKeys.length} 組有效金鑰，自動排除 ${excludedCount} 組失效金鑰！`, 'warning');
+                    } else {
+                        const msg = validKeys.length > 1 ? `已儲存 ${validKeys.length} 組金鑰！` : 'API Key 已儲存！';
+                        ui.showToast(msg, 'success');
+                    }
+                    ui.startKeyTimer(expires);
                     return;
                 }
 
-                const expires = Date.now() + (2 * 60 * 60 * 1000);
-                // 儲存為陣列
-                const storageData = { value: validKeys, expires, isMulti: validKeys.length > 1 };
-                sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
+                // 狀況二：全數失敗，但全部/部分是因為網路或 CORS 問題無法驗證，且沒有明確判定失效的金鑰
+                if (networkFailedKeys.length > 0 && invalidKeys.length === 0) {
+                    ui.hideLoader(); // 先關閉載入框，避免 confirm 阻擋時畫面全黑
+                    const confirmSave = confirm(
+                        `【網路連線或 CORS 限制】\n系統無法與 Google 伺服器連線驗證您的金鑰狀態（共 ${networkFailedKeys.length} 組）。\n這通常是暫時的網路問題或瀏覽器安全性限制。\n\n您是否要直接儲存這些金鑰？`
+                    );
+                    if (confirmSave) {
+                        ui.showLoader('正在儲存金鑰...');
+                        const expires = Date.now() + (2 * 60 * 60 * 1000);
+                        const storageData = { value: networkFailedKeys, expires, isMulti: networkFailedKeys.length > 1 };
+                        sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
 
-                // 將輸入欄位更新為僅包含有效金鑰
-                if (elements.apiKeyInput) {
-                    elements.apiKeyInput.value = validKeys.join('\n');
+                        if (elements.apiKeyInput) {
+                            elements.apiKeyInput.value = networkFailedKeys.join('\n');
+                        }
+
+                        ui.showToast(`已儲存 ${networkFailedKeys.length} 組金鑰（未通過線上驗證）`, 'warning');
+                        ui.startKeyTimer(expires);
+                    }
+                    return;
                 }
 
-                const invalidCount = keys.length - validKeys.length;
-                if (invalidCount > 0) {
-                    ui.showToast(`已成功儲存 ${validKeys.length} 組有效金鑰，自動排除 ${invalidCount} 組失效金鑰！`, 'warning');
-                } else {
-                    const msg = validKeys.length > 1 ? `已儲存 ${validKeys.length} 組金鑰！` : 'API Key 已儲存！';
-                    ui.showToast(msg, 'success');
-                }
-                ui.startKeyTimer(expires);
+                // 狀況三：全數驗證失敗，且包含明確被判定無效的金鑰
+                ui.showToast('輸入的金鑰均無效或已耗盡額度！儲存已被攔截。', 'error');
             } catch (err) {
                 console.error("[System] Validation failed:", err);
                 ui.showToast('驗證金鑰時發生未知錯誤，請稍後再試。', 'error');
