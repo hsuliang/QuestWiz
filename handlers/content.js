@@ -102,20 +102,12 @@ export async function callGeminiForContent(promptString) {
     }, 2500); 
     
     try {
-        // [New] 讀取模型設定
-        const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
-        const isHighQuality = savedModel === 'high-quality';
-        const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
+        const isHighQuality = false;
+        const modelName = CONFIG.MODELS.STANDARD;
 
-        console.log('[Content] Model Selection:', { savedModel, isHighQuality, modelName });
+        console.log('[Content] Model Selection:', { isHighQuality, modelName });
 
-        const genConfig = { "temperature": isHighQuality ? 0.4 : 0.7, "maxOutputTokens": 8192, "responseMimeType": "application/json" };
-        if (isHighQuality) { // [New] 如果是高品質模式，嘗試啟用 thinking
-             // 注意：內文生成可能不需要嚴格的 thinking，但如果用 v3 模型，參數要對應
-             // 若 v3 支援 thinking，則加入
-             genConfig.thinking = true;
-             genConfig.include_thoughts = false;
-        }
+        const genConfig = { "temperature": 0.7, "maxOutputTokens": 8192, "responseMimeType": "application/json" };
 
         const payload = {
             "contents": [{"parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }] }],
@@ -436,10 +428,7 @@ ${rawContent.substring(0, 30000)}
 `;
 
             try {
-                // [New] 讀取模型設定
-                const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
-                const isHighQuality = savedModel === 'high-quality';
-                const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
+                const modelName = CONFIG.MODELS.STANDARD;
 
                 // [Refactor] 使用中央化請求進行清洗
                 const payload = {

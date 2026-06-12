@@ -186,10 +186,7 @@ async function requestKeywordAnalysis(text, images, apiKey, signal) {
         taskParts.push({ inline_data: { mime_type: img.type, data: img.data } });
     });
 
-    // [New] 讀取模型設定
-    const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
-    const isHighQuality = savedModel === 'high-quality';
-    const modelName = isHighQuality ? CONFIG.MODELS.HIGH_QUALITY : CONFIG.MODELS.STANDARD;
+    const modelName = CONFIG.MODELS.STANDARD;
 
     const payload = {
         "contents": [{ "role": "user", "parts": taskParts }],

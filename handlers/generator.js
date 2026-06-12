@@ -166,16 +166,8 @@ async function proceedWithGeneration(settings) {
     console.log('[Generator] proceedWithGeneration started');
     const { requestId, signal } = state.startTask('generate');
     
-    // [New] 讀取模型設定
-    const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
-    const isHighQuality = savedModel === 'high-quality';
-
-    if (isHighQuality) {
-        ui.showLoader("Gemini 3 深度思考中... (這可能需要一點時間)");
-        ui.showToast('正在使用 Gemini 3 預覽版進行深度推理', 'info');
-    } else {
-        ui.showLoader("AI 正在光速生成題目...");
-    }
+    const isHighQuality = false;
+    ui.showLoader("AI 正在光速生成題目...");
 
     // 清空舊資料，觸發響應式 UI 清空預覽
     state.setGeneratedQuestions([]);

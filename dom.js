@@ -14,8 +14,6 @@ export const elements = {
     get apiStepsContainer() { return document.getElementById('api-steps-container'); },
     get apiStepsArrow() { return document.getElementById('api-steps-arrow'); },
     get themeRadios() { return document.querySelectorAll('input[name="theme"]'); },
-    get modelRadios() { return document.querySelectorAll('input[name="model-mode"]'); },
-    get modelQuotaWarning() { return document.getElementById('model-quota-warning'); },
     get mainContainer() { return document.getElementById('main-container'); },
 
     // 提供內容 (Content Input)

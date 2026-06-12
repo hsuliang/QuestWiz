@@ -65,7 +65,6 @@
                             <div class="border-b border-gray-200">
                                 <nav class="-mb-px flex space-x-4 overflow-x-auto custom-scrollbar">
                                     <button class="settings-tab-btn active whitespace-nowrap" data-i18n="tab_api">API 金鑰</button>
-                                    <button class="settings-tab-btn whitespace-nowrap" data-i18n="tab_model">模型設定</button>
                                     <button class="settings-tab-btn whitespace-nowrap" data-i18n="tab_level">學生程度</button>
                                     <button id="settings-tab-theme" class="settings-tab-btn" role="tab" data-i18n="tab_theme">布景主題</button>
                                     <button id="settings-tab-language" class="settings-tab-btn" role="tab" data-i18n="tab_language">語言</button>
@@ -114,29 +113,6 @@
                                     <p class="text-xs text-red-500 mt-2 font-semibold" data-i18n="api_expiry_warning">
                                         金鑰將暫存 2 小時，關閉分頁後即失效。請勿在公用電腦上儲存。
                                     </p>
-                                </div>
-                                <!-- 模型設定 -->
-                                <div id="settings-content-model" class="settings-tab-content" role="tabpanel">
-                                    <label class="block text-sm font-bold text-gray-700 mb-3">請選擇 AI 思考模型：</label>
-                                    <div class="space-y-3">
-                                        <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative">
-                                            <input type="radio" name="model-mode" value="standard" class="mt-1 mr-3 text-indigo-600 focus:ring-indigo-500" checked>
-                                            <div>
-                                                <span class="block text-sm font-bold text-gray-800">🚀 標準模式 (Lite)</span>
-                                                <span class="block text-xs text-gray-500 mt-1">速度快、額度略高。適合一般大量出題。</span>
-                                            </div>
-                                        </label>
-                                        <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative">
-                                            <input type="radio" name="model-mode" value="high-quality" class="mt-1 mr-3 text-indigo-600 focus:ring-indigo-500">
-                                            <div>
-                                                <span class="block text-sm font-bold text-indigo-700">🧠 高品質模式 (Flash)</span>
-                                                <span class="block text-xs text-gray-500 mt-1">推理強、額度較低。適合專家命題與複雜邏輯。</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <div id="model-quota-warning" class="mt-3 p-2 bg-amber-50 text-amber-700 text-xs rounded border border-amber-100 hidden">
-                                        ⚠️ 注意：高品質模式每日僅限 20 次請求，請謹慎使用。
-                                    </div>
                                 </div>
                                 <div id="settings-content-level" class="settings-tab-content" role="tabpanel">
                                      <div>

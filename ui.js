@@ -315,35 +315,6 @@ export function initLanguage() {
     document.querySelectorAll('input[name="language"]').forEach(r => r.addEventListener('change', e => updateLanguage(e.target.value)));
 }
 
-export function initModelSelection() {
-    const savedModel = localStorage.getItem('quizGenModel_v1') || 'standard';
-    const radios = elements.modelRadios;
-    const warning = elements.modelQuotaWarning;
-
-    if (!radios) return;
-
-    radios.forEach(r => {
-        if (r.value === savedModel) r.checked = true;
-        
-        r.addEventListener('change', (e) => {
-            const val = e.target.value;
-            localStorage.setItem('quizGenModel_v1', val);
-            
-            if (val === 'high-quality') {
-                warning?.classList.remove('hidden');
-                showToast('已切換至高品質模式 (每日限額 20 次)', 'info');
-            } else {
-                warning?.classList.add('hidden');
-            }
-        });
-    });
-
-    // 初始狀態檢查
-    if (savedModel === 'high-quality') {
-        warning?.classList.remove('hidden');
-    }
-}
-
 export function showVersionModal() {
     if (elements.versionModal) elements.versionModal.classList.remove('hidden');
 }

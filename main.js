@@ -89,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     safeExecute('Apply Layout', () => ui.applyLayoutPreference());
     safeExecute('Apply Theme', () => ui.applyThemePreference());
     safeExecute('Init Language', () => ui.initLanguage());
-    safeExecute('Init Model', () => ui.initModelSelection());
     safeExecute('Visitor Count', () => ui.updateVisitorCount());
     
     safeExecute('Restore Mode', () => {
