@@ -109,7 +109,7 @@ export async function resolveLatestFlashModel(apiKey, throwOnError = false) {
 export async function validateApiKey(apiKey) {
     if (!apiKey) throw new Error('API key is empty');
     
-    const apiUrl = `${CONFIG.BASE_URL}/models/gemini-1.5-flash?key=${apiKey}`;
+    const apiUrl = `${CONFIG.BASE_URL}/models/gemini-flash-latest?key=${apiKey}`;
     try {
         const response = await fetch(apiUrl);
         
