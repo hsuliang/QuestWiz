@@ -4,6 +4,101 @@ import { elements } from './dom.js';
 import { getAdaptiveSystemInstruction, getQuestionUserPrompt, PROMPT_VERSION } from './prompts/index.js'; 
 import { parseGeminiError } from './utils.js'; 
 
+// 快取金鑰對應的模型清單：apiKey -> ['gemini-2.5-flash', 'gemini-1.5-flash', ...]
+const modelCache = new Map();
+
+// 當完全無法取得模型清單時的最後保險版本（官方常綠別名）
+const FALLBACK_MODEL = 'gemini-flash-latest';
+
+/**
+ * 解析特定 API Key 可用的所有 Flash 模型，並按版本從新到舊排序
+ * @param {string} apiKey - Gemini API Key
+ * @param {boolean} throwOnError - 是否在網路錯誤時直接拋出異常（用於儲存驗證）
+ * @returns {Promise<string[]>} 排序後的模型名稱陣列
+ */
+export async function resolveFlashModelsList(apiKey, throwOnError = false) {
+    if (!apiKey) {
+        return [FALLBACK_MODEL];
+    }
+    
+    if (modelCache.has(apiKey)) {
+        return modelCache.get(apiKey);
+    }
+
+    try {
+        const response = await fetch(`${CONFIG.BASE_URL}/models?key=${apiKey}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch models: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.models || !Array.isArray(data.models)) {
+            throw new Error('Invalid response format');
+        }
+
+        // 1. 過濾：只保留包含 'flash' 且支援 'generateContent' 的正式模型，排除預覽版 (preview, lite)
+        const flashModels = data.models.filter(m => {
+            const name = m.name || '';
+            const nameLower = name.toLowerCase();
+            const hasGenerateContent = m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent');
+            return hasGenerateContent && 
+                   nameLower.includes('flash') && 
+                   !nameLower.includes('preview') && 
+                   !nameLower.includes('lite');
+        });
+
+        if (flashModels.length === 0) {
+            return [FALLBACK_MODEL];
+        }
+
+        // 2. 解析版本號：提取 'gemini-X.Y-flash' 中的 X.Y 數字
+        const parsedModels = flashModels.map(m => {
+            const parts = m.name.split('/');
+            const suffix = parts[parts.length - 1];
+            const versionMatch = suffix.match(/gemini-(\d+\.?\d*)-flash/i);
+            const versionNum = versionMatch ? parseFloat(versionMatch[1]) : 0;
+            
+            return { suffix, versionNum };
+        });
+
+        // 3. 版本號由高到低排序 (降冪)
+        parsedModels.sort((a, b) => {
+            if (b.versionNum !== a.versionNum) {
+                return b.versionNum - a.versionNum;
+            }
+            return b.suffix.localeCompare(a.suffix, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        const list = parsedModels.map(m => m.suffix).filter(m => m);
+        
+        // 確保極穩定的底線模型存在於清單中
+        if (!list.includes(FALLBACK_MODEL)) {
+            list.push(FALLBACK_MODEL);
+        }
+
+        console.log("Resolved Flash models order:", list);
+        modelCache.set(apiKey, list);
+        return list;
+    } catch (e) {
+        console.warn("[系統警告] 動態模型解析失敗，已啟用動態常綠降級方案:", FALLBACK_MODEL, e);
+        if (throwOnError) throw e;
+        return [FALLBACK_MODEL];
+    }
+}
+
+/**
+ * 取得最新的一款可用 Flash 模型（保留向後相容性用）
+ */
+export async function resolveLatestFlashModel(apiKey, throwOnError = false) {
+    try {
+        const list = await resolveFlashModelsList(apiKey, throwOnError);
+        return list[0] || FALLBACK_MODEL;
+    } catch (e) {
+        if (throwOnError) throw e;
+        return FALLBACK_MODEL;
+    }
+}
+
+
 export async function fetchWithRetry(url, options, retries = 3, initialDelay = 2000) {
     let currentDelay = initialDelay;
     for (let i = 0; i < retries; i++) {
@@ -57,7 +152,7 @@ let currentKeyPointer = -1; // [Updated] 初始化為 -1，表示尚未選定起
 /**
  * 中央統一請求入口：支援多金鑰自動切換與限流
  */
-export async function makeCentralizedRequest(payload, signal, modelName = CONFIG.MODEL_NAME, retryCount = 0) {
+export async function makeCentralizedRequest(payload, signal, modelName = CONFIG.MODEL_NAME) {
     const keys = getApiKeyList();
     if (keys.length === 0) throw new Error(t('error_api_missing'));
 
@@ -68,67 +163,122 @@ export async function makeCentralizedRequest(payload, signal, modelName = CONFIG
         console.log(`[API] Randomized start key index: ${currentKeyPointer}`);
     }
 
-    // 確保指針不越界 (防止使用者中途刪減 Key)
-    if (currentKeyPointer >= keys.length) currentKeyPointer = 0;
+    const startIndex = currentKeyPointer;
+    let lastError = null;
 
-    const apiKey = keys[currentKeyPointer];
-    const apiUrl = `${CONFIG.BASE_URL}/models/${modelName}:generateContent`;
+    // 第一層：輪詢所有金鑰
+    for (let i = 0; i < keys.length; i++) {
+        const keyIndex = (startIndex + i) % keys.length;
+        const apiKey = keys[keyIndex];
+        currentKeyPointer = keyIndex; // 更新目前使用的金鑰指針
 
-    // [New] 監控目前使用的金鑰
-    const maskedKey = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.slice(-4)}` : 'INVALID';
-    console.log(`%c[API Request] Using Key #${currentKeyPointer + 1} (${maskedKey}) | Model: ${modelName}`, "color: #10b981;");
-
-    try {
-        const response = await fetchWithRetry(apiUrl, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, 
-            body: JSON.stringify(payload), 
-            signal 
-        });
-
-        if (!response.ok) {
-            // [Fix] 核心邏輯：捕捉 429 並嘗試切換 Key (圓桌轉盤法)
-            // 限制最大重試次數等於 Key 的數量，避免無限迴圈
-            if (response.status === 429 && retryCount < keys.length) {
-                const oldIndex = currentKeyPointer;
-                currentKeyPointer = (currentKeyPointer + 1) % keys.length; // Round-Robin
-                
-                console.warn(`[API] Key #${oldIndex + 1} exhausted (429). Switching to Key #${currentKeyPointer + 1} (Round-Robin)...`);
-                showToast(`正在嘗試第 ${currentKeyPointer + 1} 組備用金鑰...`, 'info');
-                
-                // 遞迴重試，並增加計數器
-                return await makeCentralizedRequest(payload, signal, modelName, retryCount + 1);
+        // 取得該金鑰適用的模型階梯
+        const resolvedModels = await resolveFlashModelsList(apiKey);
+        
+        // 建立該次請求的模型階梯佇列
+        const modelQueue = [];
+        if (modelName === CONFIG.MODELS.HIGH_QUALITY) {
+            modelQueue.push(modelName);
+            for (const m of resolvedModels) {
+                if (!modelQueue.includes(m)) {
+                    modelQueue.push(m);
+                }
             }
-
-            const errorBody = await response.json().catch(() => ({ error: { message: '無法讀取錯誤內容' } }));
-            // 直接拋出帶有狀態碼的錯誤，讓 handleError 統一轉譯
-            const err = new Error(`${response.status} ${errorBody.error.message}`);
-            err.status = response.status;
-            throw err;
-        }
-        return await response.json();
-    } catch (error) {
-        // [Fallback] 如果是 Gemini 3 失敗 (404/400/500)，自動降級回 Gemini 2.5
-        if (modelName === CONFIG.MODELS.HIGH_QUALITY && error.status !== 429) { 
-            // ... (保持原樣)
-            console.warn(`[API] Gemini 3 failed (${error.message}). Falling back to ${CONFIG.MODELS.HIGH_QUALITY_BACKUP}...`);
-            showToast('Gemini 3 暫時無法使用，已自動切換回穩定的 Gemini 2.5', 'warning');
-            
-            const fallbackPayload = JSON.parse(JSON.stringify(payload));
-            if (fallbackPayload.generationConfig) {
-                delete fallbackPayload.generationConfig.thinking;
-                delete fallbackPayload.generationConfig.include_thoughts;
+        } else {
+            // 標準模式：直接使用動態模型階梯，以求自動升級與保底
+            for (const m of resolvedModels) {
+                if (!modelQueue.includes(m)) {
+                    modelQueue.push(m);
+                }
             }
-            return await makeCentralizedRequest(fallbackPayload, signal, CONFIG.MODELS.HIGH_QUALITY_BACKUP);
+            // 如果請求特定模型（非 standard），且不在佇列中，將其推入最前方以求向後相容
+            if (modelName && modelName !== CONFIG.MODELS.STANDARD && !modelQueue.includes(modelName)) {
+                modelQueue.unshift(modelName);
+            }
         }
 
-        // 如果是網路錯誤或 429 且還有其他 Key 可試
-        if ((error.message.includes('fetch') || error.status === 429) && retryCount < keys.length) {
-            currentKeyPointer = (currentKeyPointer + 1) % keys.length; // Round-Robin
-            return await makeCentralizedRequest(payload, signal, modelName, retryCount + 1);
+        let keyErrorOccurred = false;
+
+        // 第二層：依序嘗試版本由新到舊的模型
+        for (const model of modelQueue) {
+            try {
+                // 如果嘗試的不是高品質模型，清除 payload 中不支援的 thinking 設定
+                const currentPayload = JSON.parse(JSON.stringify(payload));
+                if (model !== CONFIG.MODELS.HIGH_QUALITY && currentPayload.generationConfig) {
+                    delete currentPayload.generationConfig.thinking;
+                    delete currentPayload.generationConfig.include_thoughts;
+                }
+
+                const maskedKey = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.slice(-4)}` : 'INVALID';
+                console.log(`%c[API Request] Trying Key #${keyIndex + 1} (${maskedKey}) | Model: ${model}`, "color: #10b981;");
+
+                const apiUrl = `${CONFIG.BASE_URL}/models/${model}:generateContent`;
+                const response = await fetchWithRetry(apiUrl, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, 
+                    body: JSON.stringify(currentPayload), 
+                    signal 
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json().catch(() => ({ error: { message: '無法讀取錯誤內容' } }));
+                    const errorMsg = errorBody.error?.message || response.statusText;
+                    const status = response.status;
+
+                    console.warn(`[API] Key #${keyIndex + 1} with Model ${model} failed (HTTP ${status}): ${errorMsg}`);
+
+                    // 核心容錯邏輯：
+                    // - 400 (金鑰無效) 或 429 (額度耗盡) 屬於金鑰問題，應直接中斷當前模型階梯，切換金鑰
+                    if (status === 429) {
+                        showToast(`金鑰 #${keyIndex + 1} 額度耗盡 (429)，正在嘗試下一組金鑰...`, 'warning');
+                        throw new Error(`QUOTA_EXCEEDED: ${errorMsg}`);
+                    }
+                    if (status === 400 && (errorMsg.includes('API key') || errorMsg.includes('key not valid') || errorMsg.includes('API_KEY_INVALID'))) {
+                        showToast(`金鑰 #${keyIndex + 1} 無效 (400)，正在嘗試下一組金鑰...`, 'warning');
+                        throw new Error(`INVALID_KEY: ${errorMsg}`);
+                    }
+
+                    // 如果是 modelName === HIGH_QUALITY 失敗，提示降級
+                    if (model === CONFIG.MODELS.HIGH_QUALITY) {
+                        showToast('Gemini 3 暫時無法使用，已自動切換回穩定的 Gemini 2.5/Flash', 'warning');
+                    }
+                    
+                    const err = new Error(`MODEL_ERROR: ${errorMsg}`);
+                    err.status = status;
+                    throw err;
+                }
+
+                // 請求成功，直接回傳
+                return await response.json();
+
+            } catch (error) {
+                lastError = error;
+
+                // 若為金鑰問題，中斷模型循環
+                if (error.message.startsWith('QUOTA_EXCEEDED') || error.message.startsWith('INVALID_KEY')) {
+                    keyErrorOccurred = true;
+                    break;
+                }
+
+                // 處理 AbortError
+                if (error.name === 'AbortError') {
+                    throw error;
+                }
+
+                // 其他錯誤 (404/503等模型問題) 繼續執行 model 循環
+                console.warn(`[API] Model ${model} failed: ${error.message}. Trying next fallback model...`);
+            }
         }
-        throw error;
+
+        // 若因為金鑰問題而中斷，繼續下一個金鑰
+        if (keyErrorOccurred) {
+            continue;
+        }
     }
+
+    // 若全部金鑰與模型均失敗，拋出最終錯誤
+    const finalErrorMsg = lastError ? lastError.message : 'Unknown Error';
+    throw new Error(`所有金鑰與模型嘗試皆失敗。最後錯誤: ${finalErrorMsg}`);
 }
 
 // 為了內部向後相容

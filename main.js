@@ -2,6 +2,7 @@ import { elements } from './dom.js';
 import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as state from './state.js';
+import * as api from './api.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
@@ -172,22 +173,57 @@ document.addEventListener('DOMContentLoaded', () => {
             SessionHandlers.clearAllInputs();
         }, 'clearAndNewBtn');
 
-        bind(elements.saveApiKeyBtn, 'click', () => {
+        bind(elements.saveApiKeyBtn, 'click', async () => {
             const rawValue = elements.apiKeyInput?.value || '';
             // 解析多組金鑰：支援換行、逗號、分號分隔
             const keys = rawValue.split(/[\n,;]+/).map(k => k.trim()).filter(k => k.length > 5);
             
-            if (keys.length > 0) {
+            if (keys.length === 0) {
+                ui.showToast('請輸入有效的 API Key', 'error');
+                return;
+            }
+
+            ui.showLoader('正在驗證金鑰可用性...');
+            try {
+                // 並行呼叫探針以驗證金鑰是否正常
+                const validationPromises = keys.map(async (key) => {
+                    await api.resolveLatestFlashModel(key, true);
+                    return key;
+                });
+
+                const results = await Promise.allSettled(validationPromises);
+                const validKeys = results
+                    .filter(r => r.status === 'fulfilled')
+                    .map(r => r.value);
+
+                if (validKeys.length === 0) {
+                    ui.showToast('所有輸入的金鑰均無效或已耗盡額度！儲存已被攔截。', 'error');
+                    return;
+                }
+
                 const expires = Date.now() + (2 * 60 * 60 * 1000);
                 // 儲存為陣列
-                const storageData = { value: keys, expires, isMulti: keys.length > 1 };
+                const storageData = { value: validKeys, expires, isMulti: validKeys.length > 1 };
                 sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
-                
-                const msg = keys.length > 1 ? `已儲存 ${keys.length} 組金鑰！` : 'API Key 已儲存！';
-                ui.showToast(msg, 'success');
+
+                // 將輸入欄位更新為僅包含有效金鑰
+                if (elements.apiKeyInput) {
+                    elements.apiKeyInput.value = validKeys.join('\n');
+                }
+
+                const invalidCount = keys.length - validKeys.length;
+                if (invalidCount > 0) {
+                    ui.showToast(`已成功儲存 ${validKeys.length} 組有效金鑰，自動排除 ${invalidCount} 組失效金鑰！`, 'warning');
+                } else {
+                    const msg = validKeys.length > 1 ? `已儲存 ${validKeys.length} 組金鑰！` : 'API Key 已儲存！';
+                    ui.showToast(msg, 'success');
+                }
                 ui.startKeyTimer(expires);
-            } else {
-                ui.showToast('請輸入有效的 API Key', 'error');
+            } catch (err) {
+                console.error("[System] Validation failed:", err);
+                ui.showToast('驗證金鑰時發生未知錯誤，請稍後再試。', 'error');
+            } finally {
+                ui.hideLoader();
             }
         }, 'saveApiKeyBtn');
         bind(elements.clearApiKeyBtn, 'click', () => {

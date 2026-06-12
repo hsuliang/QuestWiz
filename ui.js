@@ -174,6 +174,14 @@ export function populateVersionHistory() {
     if (!content) return;
     content.innerHTML = `
         <div class="space-y-6">
+            <div class="border-l-4 border-indigo-600 pl-4">
+                <h4 class="font-bold text-lg text-indigo-800">V9.9 Gemini API 動態保底與故障降級優化 (2026/06/12)</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600 mt-2 space-y-1">
+                    <li>保底常綠化：移除非動態硬編碼模型，引入官方常綠別名 `'gemini-flash-latest'` 提供無感平滑降級。</li>
+                    <li>雙層自癒重試：實作 API 金鑰輪詢與可用模型階梯降級雙層架構，區分金鑰與模型級錯誤。</li>
+                    <li>金鑰健康探針：儲存 API 金鑰前進行並行探針檢測，自動篩除失效金鑰並預熱模型快取。</li>
+                </ul>
+            </div>
             <div class="border-l-4 border-blue-600 pl-4">
                 <h4 class="font-bold text-lg text-blue-800">V9.8.4 命題風格精準化與 UX 深度優化 (2026/01/17)</h4>
                 <ul class="list-disc list-inside text-sm text-gray-600 mt-2 space-y-1">
