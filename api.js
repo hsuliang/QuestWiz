@@ -11,7 +11,7 @@ const modelCache = new Map();
 const FALLBACK_MODEL = 'gemini-flash-latest';
 
 // 瀏覽器環境下，因 Google /models 列表 API 不支援 CORS，此清單作為穩健的本地保底階梯
-const BROWSER_FALLBACK_LIST = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+const BROWSER_FALLBACK_LIST = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
 
 /**
  * 解析特定 API Key 可用的所有 Flash 模型，並按版本從新到舊排序
@@ -83,6 +83,7 @@ export async function resolveFlashModelsList(apiKey, throwOnError = false) {
         return list;
     } catch (e) {
         console.warn("[系統警告] 動態模型解析失敗 (可能因瀏覽器 CORS 限制)，已啟用本地保底階梯方案:", e);
+        modelCache.set(apiKey, [...BROWSER_FALLBACK_LIST]);
         if (throwOnError) throw e;
         return [...BROWSER_FALLBACK_LIST];
     }
@@ -118,8 +119,8 @@ export async function validateApiKey(apiKey) {
             throw new Error(`INVALID_KEY: ${errorBody.error?.message || `HTTP ${response.status}`}`);
         }
         
-        // 驗證成功後，為其預熱快取，避免常規出題時再發送會被 CORS 阻擋的 models 請求
-        modelCache.set(apiKey, [...BROWSER_FALLBACK_LIST]);
+        // 驗證成功後，為其預熱快取，嘗試動態獲取最新可用模型；若失敗則快取本地保底清單
+        await resolveFlashModelsList(apiKey).catch(() => {});
         return true;
     } catch (e) {
         if (e.message && e.message.startsWith('INVALID_KEY:')) {
