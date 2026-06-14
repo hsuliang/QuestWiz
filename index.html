@@ -629,7 +629,7 @@
                     <!-- Editor Content -->
                     <div id="work-content-edit" class="work-tab-content active flex flex-col flex-grow">
                         <div id="preview-loader" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center z-10 hidden">
-                            <p id="loading-text" class="text-lg font-semibold text-gray-700 text-center" data-i18n="loading_questions">AI 正在為您生成題目...</p>
+                            <p id="loading-text" class="text-lg font-semibold text-gray-700 text-center whitespace-pre-line" data-i18n="loading_questions">AI 正在為您生成題目...</p>
                         </div>
                         
                         <div id="preview-placeholder" class="flex-grow flex flex-col items-center justify-center text-center text-gray-400 py-20">
@@ -641,6 +641,9 @@
                             <p class="text-lg font-bold text-gray-500 mb-2" data-i18n="preview_placeholder">請在左側提供內容並設定選項</p>
                             <p class="text-sm text-gray-400 max-w-xs">AI 老師將在這裡為您即時呈現生成的精彩試題</p>
                         </div>
+
+                        <!-- 出題模型標示徽章 -->
+                        <div id="model-badge-container" class="mb-4 flex items-center justify-start hidden"></div>
 
                         <!-- 題目列表區 -->
                         <div id="questions-container" class="space-y-6"></div>

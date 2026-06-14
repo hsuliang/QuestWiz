@@ -1,8 +1,27 @@
 import { CONFIG } from './config.js';
-import { showToast, stopKeyTimer, t } from './ui.js';
+import { showToast, stopKeyTimer, t, showLoader } from './ui.js';
 import { elements } from './dom.js'; 
 import { getAdaptiveSystemInstruction, getQuestionUserPrompt, PROMPT_VERSION } from './prompts/index.js'; 
 import { parseGeminiError } from './utils.js'; 
+
+const MODEL_FRIENDLY_NAMES = {
+    'gemini-3-flash-preview': 'Gemini 3.0 Flash',
+    'gemini-3.5-flash': 'Gemini 3.5 Flash',
+    'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemini-flash-latest': 'Gemini Flash'
+};
+
+function getFriendlyModelName(modelName) {
+    if (!modelName) return 'Gemini 2.5 Flash Lite';
+    const key = modelName.toLowerCase();
+    for (const [k, v] of Object.entries(MODEL_FRIENDLY_NAMES)) {
+        if (key.includes(k)) {
+            return v;
+        }
+    }
+    return modelName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+} 
 
 // 快取金鑰對應的模型清單：apiKey -> ['gemini-2.5-flash', 'gemini-1.5-flash', ...]
 const modelCache = new Map();
@@ -234,6 +253,10 @@ export async function makeCentralizedRequest(payload, signal, modelName = CONFIG
         // 第二層：依序嘗試版本由新到舊的模型
         for (const model of modelQueue) {
             try {
+                // 動態更新出題等待畫面 (Loader) 的模型提示文字
+                const friendlyName = getFriendlyModelName(model);
+                showLoader(`AI 正在出題中...\n(使用模型： ${friendlyName})`);
+
                 // 如果嘗試的不是高品質模型，清除 payload 中不支援的 thinking 設定
                 const currentPayload = JSON.parse(JSON.stringify(payload));
                 if (model !== CONFIG.MODELS.HIGH_QUALITY && currentPayload.generationConfig) {
@@ -280,8 +303,12 @@ export async function makeCentralizedRequest(payload, signal, modelName = CONFIG
                     throw err;
                 }
 
-                // 請求成功，直接回傳
-                return await response.json();
+                // 請求成功，注入實際成功的模型，然後回傳
+                const resultJson = await response.json();
+                if (resultJson) {
+                    resultJson._actualModelUsed = model;
+                }
+                return resultJson;
 
             } catch (error) {
                 lastError = error;
@@ -374,8 +401,9 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
     }
 
     let parsedResult = parseGeminiResponse(result);
+    const actualModel = result?._actualModelUsed || modelName;
     if (!parsedResult.error && parsedResult.questions.length > 0) {
-        return { questions: parsedResult.questions, suggestedTitle: parsedResult.suggestedTitle, meta: { promptVersion: PROMPT_VERSION, modelName: modelName } };
+        return { questions: parsedResult.questions, suggestedTitle: parsedResult.suggestedTitle, meta: { promptVersion: PROMPT_VERSION, modelName: actualModel } };
     }
 
     const repairPayload = {
@@ -387,9 +415,10 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
         ]
     };
     result = await makeGeminiRequest(repairPayload, signal, modelName);
+    const actualModelRepaired = result?._actualModelUsed || modelName;
     parsedResult = parseGeminiResponse(result);
     if (!parsedResult.error && parsedResult.questions.length > 0) {
-        return { questions: parsedResult.questions, suggestedTitle: parsedResult.suggestedTitle, meta: { promptVersion: PROMPT_VERSION, modelName: modelName, repaired: true } };
+        return { questions: parsedResult.questions, suggestedTitle: parsedResult.suggestedTitle, meta: { promptVersion: PROMPT_VERSION, modelName: actualModelRepaired, repaired: true } };
     }
     throw new Error("AI 輸出格式修復失敗。");
 }

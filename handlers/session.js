@@ -38,10 +38,10 @@ export function restoreDraft() {
             state.setGeneratedQuestions(stateDraft.generatedQuestions);
             ui.renderQuestionsForEditing(stateDraft.generatedQuestions);
             
-            // [Fix] 恢復摘要卡片 (如果有題目)
-            // 這裡我們需要重新計算摘要並渲染，但簡單的做法是依賴 generate 時的 meta
-            // 不過因為 state 沒存 summary，所以這裡暫時只恢復題目
-            // 如果要完美恢復，需要在 state 裡多存 summaryData
+            // [Fix] 恢復摘要卡片與模型徽章
+            if (stateDraft.quizSummary) {
+                state.setQuizSummary(stateDraft.quizSummary);
+            }
         }
         if (stateDraft.uploadedImages && stateDraft.uploadedImages.length > 0) {
             state.setUploadedImages(stateDraft.uploadedImages);
@@ -151,6 +151,7 @@ export function clearContent(showToast = true) {
     
     // 4. 清除已生成題目與摘要 (避免素材與題目不符)
     state.setGeneratedQuestions([]);
+    state.setQuizSummary(null);
     ui.renderQuestionsForEditing([]); 
     
     const summaryContainer = document.getElementById('quiz-summary-container');

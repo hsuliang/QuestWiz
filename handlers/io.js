@@ -5,6 +5,25 @@ import { elements } from '../dom.js';
 import { compressImage } from '../utils.js';
 import { saveInputDraft, triggerOrUpdate } from './session.js';
 
+const MODEL_FRIENDLY_NAMES = {
+    'gemini-3-flash-preview': 'Gemini 3.0 Flash',
+    'gemini-3.5-flash': 'Gemini 3.5 Flash',
+    'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemini-flash-latest': 'Gemini Flash'
+};
+
+function getFriendlyModelName(modelName) {
+    if (!modelName) return 'Gemini 2.5 Flash Lite';
+    const key = modelName.toLowerCase();
+    for (const [k, v] of Object.entries(MODEL_FRIENDLY_NAMES)) {
+        if (key.includes(k)) {
+            return v;
+        }
+    }
+    return modelName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // Helper for dynamic script loading
 function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -244,9 +263,16 @@ export async function exportFile() {
                 } else if (isTF) {
                     htmlContent += `<div style="margin-left: 25px; margin-top: 5px;">(  ) 是   (  ) 否</div>`;
                 }
-                
                 htmlContent += `</div>`;
             });
+
+            const modelName = state.getQuizSummary()?.modelName || '';
+            const friendlyName = getFriendlyModelName(modelName);
+            htmlContent += `
+                <div style="margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 10px; font-size: 11px; color: #666; text-align: right; page-break-inside: avoid;">
+                    * 本試卷由 QuestWiz 出題助手使用 ${friendlyName} 生成
+                </div>
+            `;
 
             htmlContent += `</div>`;
             
@@ -312,6 +338,10 @@ export async function exportFile() {
                 }
                 txtContent += `${index + 1}. ${answer}\n`;
             });
+
+            const modelName = state.getQuizSummary()?.modelName || '';
+            const friendlyName = getFriendlyModelName(modelName);
+            txtContent += `\n* 本試卷由 QuestWiz 出題助手使用 ${friendlyName} 生成\n`;
 
             const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);

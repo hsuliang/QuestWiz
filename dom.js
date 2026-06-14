@@ -80,6 +80,7 @@ export const elements = {
     get previewColumn() { return document.getElementById('preview-column'); },
     get controlsColumn() { return document.getElementById('controls-column'); },
     get previewLoader() { return document.getElementById('preview-loader'); },
+    get modelBadgeContainer() { return document.getElementById('model-badge-container'); },
     get loadingText() { return document.getElementById('loading-text'); },
     get previewPlaceholder() { return document.getElementById('preview-placeholder'); },
     get questionsContainer() { return document.getElementById('questions-container'); },

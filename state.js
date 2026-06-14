@@ -34,7 +34,7 @@ export const appState = {
 
 // --- Quiz Summary Management ---
 export function getQuizSummary() { return state.quizSummary; }
-export function setQuizSummary(summary) { state.quizSummary = summary; }
+export function setQuizSummary(summary) { state.quizSummary = summary; saveDraftState(); }
 
 // --- Keywords Management ---
 export function getSelectedKeywords() { return [...state.selectedKeywords]; }
