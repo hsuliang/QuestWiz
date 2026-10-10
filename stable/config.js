@@ -17,8 +17,6 @@ export const CONFIG = {
     EXTRACT_URL_FUNCTION_URL: 'https://extractcontentfromurl-2xblwpocfa-de.a.run.app',
     GET_YOUTUBE_TRANSCRIPT_URL: 'https://getyoutubetranscript-2xblwpocfa-de.a.run.app',
     DELETE_QUIZ_FUNCTION_URL: 'https://deletequizasadmin-2xblwpocfa-de.a.run.app',
-    
-    ADMIN_SECRET_KEY: 'AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g', 
 
     // Firebase 設定
     FIREBASE_CONFIG: {
