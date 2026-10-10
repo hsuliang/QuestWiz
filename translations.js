@@ -1,6 +1,7 @@
 export const translations = {
     "zh-TW": {
         "app_title": "ㄚ亮笑長的出題助手",
+        "app_workspace_badge": "AI 工作台",
         "app_subtitle": "您教學的好夥伴，快速便利生成多個教學平台的題庫格式",
         "settings_title": "常用設定",
         "tab_api": "API 金鑰",
@@ -192,6 +193,7 @@ export const translations = {
     },
     "en": {
         "app_title": "QuestWiz AI Assistant",
+        "app_workspace_badge": "AI Workspace",
         "app_subtitle": "Your teaching partner for generating quiz formats across multiple platforms.",
         "settings_title": "Common Settings",
         "tab_api": "API Key",

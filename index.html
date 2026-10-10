@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ㄚ亮笑長的出題助手</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <link rel="icon" type="image/png" href="Logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=workbench-redesign-1">
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -34,15 +34,29 @@
     <div id="page-wrapper">
         <div class="container mx-auto p-4 md:p-8 pb-20">
 
-            <header class="text-center mb-10 relative">
-                <div class="flex justify-center items-center mb-4">
-                    <img src="Logo.png" alt="ㄚ亮校長練功坊 Logo" class="h-12 md:h-16 mr-2">
-                    <h1 class="text-4xl md:text-5xl font-bold themed-heading relative">
-                        <span data-i18n="app_title">ㄚ亮笑長的出題助手</span>
-                        <span class="absolute -top-2 -right-8 text-sm bg-gradient-to-r from-yellow-400 to-red-500 text-white px-2 py-0.5 rounded-full shadow-md animate-pulse">AI</span>
-                    </h1>
+            <header class="app-header relative">
+                <div class="app-brand">
+                    <img src="Logo.png" alt="ㄚ亮笑長 Logo" class="app-logo">
+                    <div class="app-brand-copy">
+                        <div class="app-brand-heading">
+                            <h1 class="app-title themed-heading">
+                                <span data-i18n="app_title">ㄚ亮笑長的出題助手</span>
+                            </h1>
+                            <span class="app-ai-badge" data-i18n="app_workspace_badge">AI 工作台</span>
+                        </div>
+                        <p class="app-subtitle" data-i18n="app_subtitle">您教學的好夥伴，快速便利生成多個教學平台的題庫格式</p>
+                    </div>
                 </div>
-                <p class="text-lg text-gray-500" data-i18n="app_subtitle">您教學的好夥伴，快速便利生成多個教學平台的題庫格式</p>
+                <div class="app-header-actions">
+                    <div id="model-badge-container" class="app-engine-badge hidden"></div>
+                    <button id="header-library-btn" type="button" class="app-library-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5v16M8 7h8M8 11h8" />
+                        </svg>
+                        <span class="app-library-label" data-i18n="tab_community">題庫大廳</span>
+                    </button>
+                </div>
             </header>
 
             <main id="main-container" class="flex flex-col lg:flex-row gap-8">
@@ -644,9 +658,6 @@
                             <p class="text-sm text-gray-400 max-w-xs">AI 老師將在這裡為您即時呈現生成的精彩試題</p>
                         </div>
 
-                        <!-- 出題模型標示徽章 -->
-                        <div id="model-badge-container" class="mb-4 flex items-center justify-start hidden"></div>
-
                         <!-- 題目列表區 -->
                         <div id="questions-container" class="space-y-6"></div>
 
@@ -872,6 +883,6 @@
         </div>
     </template>
 
-    <script src="main.js?v=20261010R1" type="module"></script>
+    <script src="main.js?v=20261010R1-ui1" type="module"></script>
 </body>
 </html>

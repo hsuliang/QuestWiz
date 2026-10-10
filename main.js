@@ -345,6 +345,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.switchWorkTab(id);
             if (id === 'library') LibHandlers.refreshLibrary();
         }));
+        bind(document.getElementById('header-library-btn'), 'click', () => {
+            document.getElementById('work-tab-library')?.click();
+        }, 'headerLibraryBtn');
 
         // 學生程度連動 (治本版：事件委派)
         const updateAllLevels = (val) => {
