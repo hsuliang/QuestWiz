@@ -6,6 +6,10 @@ import { compressImage } from '../utils.js';
 import { saveInputDraft, triggerOrUpdate } from './session.js';
 
 const MODEL_FRIENDLY_NAMES = {
+    'gemini-3.8-flash': 'Gemini 3.8 Flash',
+    'gemini-3.6-flash': 'Gemini 3.6 Flash',
+    'gemini-3.5-flash-lite': 'Gemini 3.5 Flash Lite',
+    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
     'gemini-3-flash-preview': 'Gemini 3.0 Flash',
     'gemini-3.5-flash': 'Gemini 3.5 Flash',
     'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',

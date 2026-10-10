@@ -123,11 +123,14 @@ export async function incrementDownloadCount(quizId) {
  * @param {string} quizId - 要刪除的文件 ID
  */
 export async function deleteQuiz(quizId) {
+    const user = window.firebase?.auth()?.currentUser;
+    if (!user) throw new Error('請先以管理員 Google 帳號登入');
+    const token = await user.getIdToken();
     const response = await fetch(CONFIG.DELETE_QUIZ_FUNCTION_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-admin-secret': CONFIG.ADMIN_SECRET_KEY
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ id: quizId })
     });
@@ -138,4 +141,21 @@ export async function deleteQuiz(quizId) {
     }
 
     return await response.json();
+}
+export function watchAdminAuth(callback) {
+    ensureFirebaseInitialized().then(() => {
+        window.firebase.auth().onAuthStateChanged(user => callback(
+            !!user && user.email === 'hsuliang@gmail.com' && user.providerData.some(p => p.providerId === 'google.com')
+        ));
+    }).catch(() => callback(false));
+}
+
+export async function signInAdmin() {
+    await ensureFirebaseInitialized();
+    const provider = new window.firebase.auth.GoogleAuthProvider();
+    await window.firebase.auth().signInWithPopup(provider);
+}
+
+export async function signOutAdmin() {
+    await window.firebase.auth().signOut();
 }

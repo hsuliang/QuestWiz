@@ -3,6 +3,7 @@ import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as state from './state.js';
 import { elements } from './dom.js';
+import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import refactored handlers
 import * as IOHandlers from './handlers/io.js';
@@ -12,12 +13,20 @@ import * as LibHandlers from './handlers/library.js';
 import * as SessionHandlers from './handlers/session.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Admin Mode Check
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('admin') === 'true') {
-        state.setAdminMode(true);
-        console.log('%c[Admin Mode Enabled]', 'color: #ff4500; font-weight: bold;');
-    }
+    watchAdminAuth(isAdmin => {
+        state.setAdminMode(isAdmin);
+        const button = document.getElementById('admin-login-btn');
+        if (button) button.textContent = isAdmin ? '管理員登出' : '管理員登入';
+        if (!document.getElementById('work-content-library')?.classList.contains('hidden')) LibHandlers.refreshLibrary();
+    });
+    document.getElementById('admin-login-btn')?.addEventListener('click', async () => {
+        try {
+            if (state.isAdminMode()) await signOutAdmin();
+            else await signInAdmin();
+        } catch (error) {
+            ui.showToast(`管理員登入失敗：${error.message}`, 'error');
+        }
+    });
 
     // UI Initialization
     ui.populateVersionHistory();

@@ -3,6 +3,7 @@ import * as ui from './ui.js';
 import * as utils from './utils.js';
 import * as state from './state.js';
 import * as api from './api.js';
+import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
@@ -76,14 +77,15 @@ document.addEventListener('DOMContentLoaded', () => {
     safeExecute('Populate History', () => ui.populateVersionHistory());
     safeExecute('Populate Dropdowns', () => ui.populateDropdowns());
     
-    // [New] 管理員模式偵測
-    safeExecute('Detect Admin', () => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('admin') === 'hsuliang') {
-            state.setAdminMode(true);
-            console.log('%c[System] 管理員權限已啟動', 'color: #ef4444; font-weight: bold;');
-            ui.showToast('管理員模式已啟動', 'success');
-        }
+    safeExecute('Admin Auth', () => {
+        watchAdminAuth(isAdmin => {
+            state.setAdminMode(isAdmin);
+            const button = document.getElementById('admin-login-btn');
+            if (button) button.textContent = isAdmin ? '管理員登出' : '管理員登入';
+            if (document.getElementById('work-content-library')?.classList.contains('hidden') === false) {
+                LibHandlers.refreshLibrary?.();
+            }
+        });
     });
 
     safeExecute('Apply Layout', () => ui.applyLayoutPreference());
@@ -117,6 +119,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     safeExecute('Event Bindings', () => {
+        bind(document.getElementById('admin-login-btn'), 'click', async () => {
+            try {
+                if (state.isAdminMode()) await signOutAdmin();
+                else await signInAdmin();
+            } catch (error) {
+                ui.showToast(`管理員登入失敗：${error.message}`, 'error');
+            }
+        }, 'admin-login-btn');
+
         // 出題
         bind(elements.regenerateBtn, 'click', () => { ui.showLoader('AI正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'regenerateBtn');
         bind(elements.expertGenerateBtn, 'click', () => { ui.showLoader('專家模式正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'expertGenerateBtn');
@@ -215,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const expires = Date.now() + (2 * 60 * 60 * 1000);
                     const storageData = { value: validKeys, expires, isMulti: validKeys.length > 1 };
                     sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
+                    api.resetGeminiRouting();
 
                     if (elements.apiKeyInput) {
                         elements.apiKeyInput.value = validKeys.join('\n');
@@ -242,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const expires = Date.now() + (2 * 60 * 60 * 1000);
                         const storageData = { value: networkFailedKeys, expires, isMulti: networkFailedKeys.length > 1 };
                         sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
+                    api.resetGeminiRouting();
 
                         if (elements.apiKeyInput) {
                             elements.apiKeyInput.value = networkFailedKeys.join('\n');
@@ -264,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'saveApiKeyBtn');
         bind(elements.clearApiKeyBtn, 'click', () => {
             sessionStorage.removeItem('gemini_api_key_data');
+            api.resetGeminiRouting();
             if (elements.apiKeyInput) elements.apiKeyInput.value = '';
             ui.showToast('API Key 已清除', 'success');
         }, 'clearApiKeyBtn');

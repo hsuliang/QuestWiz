@@ -1,10 +1,10 @@
 // --- 組態常數 ---
 export const CONFIG = {
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-    MODEL_NAME: 'gemini-2.5-flash-lite', // 保留預設值作為回退
+    MODEL_NAME: 'gemini-3.5-flash-lite', // 保留預設值作為回退
     MODELS: {
-        STANDARD: 'gemini-2.5-flash-lite',
-        HIGH_QUALITY: 'gemini-3-flash-preview',
+        STANDARD: 'gemini-3.5-flash-lite',
+        HIGH_QUALITY: 'gemini-3.8-flash',
         HIGH_QUALITY_BACKUP: 'gemini-2.5-flash' // [New] 備援模型
     },
     QUOTAS: {
@@ -16,8 +16,6 @@ export const CONFIG = {
     EXTRACT_URL_FUNCTION_URL: 'https://extractcontentfromurl-2xblwpocfa-de.a.run.app',
     GET_YOUTUBE_TRANSCRIPT_URL: 'https://getyoutubetranscript-2xblwpocfa-de.a.run.app',
     DELETE_QUIZ_FUNCTION_URL: 'https://deletequizasadmin-2xblwpocfa-de.a.run.app',
-    
-    ADMIN_SECRET_KEY: 'AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g', 
 
     // Firebase 設定
     FIREBASE_CONFIG: {

@@ -9,9 +9,6 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
-// 重要：請務必將此金鑰替換成您在 config.js 中設定的同一個複雜金鑰！
-const ADMIN_SECRET_KEY = "AIzaSyAItStwfaWVIrOXRk5CfufUxLT20cy8E-g";
-
 // 全域設定：統一設定區域為 asia-east1
 setGlobalOptions({ region: "asia-east1" });
 
@@ -143,9 +140,16 @@ exports.getContent = onRequest({ cors: true }, async (req, res) => {
 exports.deleteQuizAsAdmin = onRequest({ cors: true }, async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
-    const secret = req.get("x-admin-secret");
-    if (secret !== ADMIN_SECRET_KEY) {
-      return res.status(403).send({ error: "Forbidden: Invalid credentials." });
+    const token = (req.get("authorization") || "").match(/^Bearer (.+)$/i)?.[1];
+    if (!token) return res.status(401).send({ error: "請先以管理員 Google 帳號登入。" });
+    try {
+      const identity = await admin.auth().verifyIdToken(token);
+      if (identity.email !== "hsuliang@gmail.com" || !identity.email_verified ||
+          identity.firebase?.sign_in_provider !== "google.com") {
+        return res.status(403).send({ error: "沒有刪除權限。" });
+      }
+    } catch (error) {
+      return res.status(401).send({ error: "登入已失效，請重新登入。" });
     }
 
     const { id } = req.body;

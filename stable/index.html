@@ -15,6 +15,7 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     
     <!-- QRCode library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -486,6 +487,7 @@
 
                     <!-- Library Content -->
                     <div id="work-content-library" class="work-tab-content flex-col flex-grow hidden">
+                        <div class="flex justify-end mb-3"><button id="admin-login-btn" type="button" class="text-sm text-gray-500 underline">管理員登入</button></div>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                             <select id="lib-domain-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
                             <select id="lib-grade-select" class="p-2 border rounded-lg text-sm bg-white outline-none"></select>
