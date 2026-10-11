@@ -4,12 +4,12 @@ import * as state from './state.js';
 import * as EditorHandlers from './handlers/editor.js';
 import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js';
-import { TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js';
-import { translations } from './translations.js';
+import { CONFIG, TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js?v=20261011R3-ui5';
+import { translations } from './translations.js?v=20261011R3-ui5';
 import { refreshUI } from './view/sync.js';
 
 // Import View Layer
-import * as view from './view/index.js';
+import * as view from './view/index.js?build=ui-result-20261011-r2';
 
 // Re-export standard view functions for backward compatibility
 export { refreshUI };
@@ -22,6 +22,7 @@ export const switchWorkTab = view.switchWorkTab;
 export const switchTab = view.switchTab;
 export const showLibraryLoader = view.showLibraryLoader;
 export const renderQuizSummary = view.renderQuizSummary;
+export const renderQuizResultHeader = view.renderQuizResultHeader;
 export const showPromptModal = view.showPromptModal;
 export const hidePromptModal = view.hidePromptModal;
 export const showShareModal = view.showShareModal;
@@ -79,6 +80,7 @@ export function renderQuestionsForEditing(questions) {
             showToast(t('toast_copy_success'), 'success');
         }
     });
+    view.renderQuizResultHeader(questions, state.getQuizSummary());
     initializeSortable(); // 重點：重新渲染後必須重啟拖曳
 }
 
@@ -281,11 +283,27 @@ export function populateVersionHistory() {
 export async function updateVisitorCount() {
     const el = document.getElementById('visitor-counter');
     if (!el) return;
+
+    const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    if (['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
+        el.dataset.status = 'local';
+        el.textContent = translations[language]?.footer_counter_local || 'Local preview';
+        return;
+    }
+
     try {
-        const res = await fetch(`https://api.counterapi.dev/v1/aliang-quiz-gen/main/up`);
+        const res = await fetch(CONFIG.VISITOR_COUNT_FUNCTION_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Counter request failed (${res.status})`);
         const data = await res.json();
-        if (data.count) el.textContent = data.count.toLocaleString();
-    } catch (e) {}
+        const count = Number(data.count);
+        if (!Number.isFinite(count) || count < 0) throw new Error('Counter response has no valid count');
+        el.dataset.status = 'count';
+        el.textContent = count.toLocaleString(language === 'en' ? 'en-US' : 'zh-TW');
+    } catch (error) {
+        el.dataset.status = 'unavailable';
+        el.textContent = translations[language]?.footer_counter_unavailable || 'Counter pending';
+        console.warn('[Visitor Counter] Count is unavailable:', error);
+    }
 }
 
 export function askForLanguageChoice() {
@@ -352,6 +370,12 @@ export function updateLanguage(lang) {
     refreshUI();
     document.documentElement.lang = lang;
     localStorage.setItem('quizGenLanguage_v1', lang);
+    const counter = document.getElementById('visitor-counter');
+    const counterStatus = counter?.dataset.status;
+    if (counter && counterStatus && counterStatus !== 'count') {
+        counter.textContent = translations[lang][`footer_counter_${counterStatus}`] || counter.textContent;
+    }
+    view.renderQuizResultHeader(state.getGeneratedQuestions(), state.getQuizSummary());
     document.querySelectorAll('input[name="language"]').forEach(r => { r.checked = (r.value === lang); });
     const libraryButtonLabel = document.querySelector('#header-library-btn .app-library-label');
     if (libraryButtonLabel) document.getElementById('header-library-btn')?.setAttribute('aria-label', libraryButtonLabel.textContent);

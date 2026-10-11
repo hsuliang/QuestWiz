@@ -1,7 +1,6 @@
 import { elements } from '../dom.js';
 import * as state from '../state.js';
-import { translations } from '../translations.js';
-import { translations } from '../translations.js';
+import { translations } from '../translations.js?build=ui-result-20261011';
 
 /**
  * 顯示提示訊息 (Toast)
@@ -85,11 +84,19 @@ export function switchWorkTab(tabId) {
         }
     });
 
+    const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    const panelTitle = document.querySelector('#work-tab-edit [data-i18n]');
+    const panelTitleKey = isLibrary ? 'tab_community' : 'tab_edit';
+    if (panelTitle) {
+        panelTitle.dataset.i18n = panelTitleKey;
+        panelTitle.textContent = translations[language]?.[panelTitleKey] || panelTitle.textContent;
+        document.getElementById('work-tab-edit')?.setAttribute('aria-label', panelTitle.textContent);
+    }
+
     const navigationLabel = document.querySelector('#header-library-btn .app-library-label');
     const navigationKey = isLibrary ? 'tab_edit' : 'tab_community';
     if (navigationLabel) {
         navigationLabel.dataset.i18n = navigationKey;
-        const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
         navigationLabel.textContent = translations[language]?.[navigationKey] || navigationLabel.textContent;
         document.getElementById('header-library-btn')?.setAttribute('aria-label', navigationLabel.textContent);
     }
@@ -109,15 +116,6 @@ export function switchTab(tabGroup, index) {
                 content.classList.toggle('active', i === index);
             }
         });
-
-    const navigationLabel = document.querySelector('#header-library-btn .app-library-label');
-    const navigationKey = isLibrary ? 'tab_edit' : 'tab_community';
-    if (navigationLabel) {
-        navigationLabel.dataset.i18n = navigationKey;
-        const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
-        navigationLabel.textContent = translations[language]?.[navigationKey] || navigationLabel.textContent;
-        document.getElementById('header-library-btn')?.setAttribute('aria-label', navigationLabel.textContent);
-    }
     }
 }
 

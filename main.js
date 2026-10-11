@@ -1,5 +1,5 @@
 import { elements } from './dom.js';
-import * as ui from './ui.js';
+import * as ui from './ui.js?v=20261011R3-ui5';
 import * as utils from './utils.js';
 import * as state from './state.js';
 import * as api from './api.js';
@@ -7,7 +7,7 @@ import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
-import * as GenHandlers from './handlers/generator.js';
+import * as GenHandlers from './handlers/generator.js?v=20261011R3-ui5';
 import * as LibHandlers from './handlers/library.js';
 import * as ContentHandlers from './handlers/content.js';
 import * as AnalyzerHandlers from './handlers/contentAnalyzer.js';
@@ -58,8 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ui.initializeSortable();
                     }
                 } else if (key === 'quizSummary') {
-                    if (value) ui.renderQuizSummary(value);
-                    else document.getElementById('quiz-summary-card')?.remove();
+                    ui.renderQuizSummary(value);
+                    ui.renderQuizResultHeader(state.getGeneratedQuestions(), value);
                 } else if (key === 'selectedKeywords') {
                     AnalyzerHandlers.updateHighlighter();
                     if (ui.refreshUI) ui.refreshUI();
@@ -217,6 +217,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // 出題
         bind(elements.regenerateBtn, 'click', () => { ui.showLoader('AI正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'regenerateBtn');
         bind(elements.expertGenerateBtn, 'click', () => { ui.showLoader('專家模式正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'expertGenerateBtn');
+        bind(document.getElementById('result-regenerate-btn'), 'click', () => elements.regenerateBtn?.click(), 'resultRegenerateBtn');
+        bind(elements.quizTitleInput, 'input', (event) => {
+            const summary = state.getQuizSummary();
+            ui.renderQuizResultHeader(state.getGeneratedQuestions(), summary ? { ...summary, title: event.target.value.trim() } : summary);
+        }, 'quizTitleInput');
+        bind(document.getElementById('add-custom-question-btn'), 'click', () => {
+            const questionType = state.getQuizSummary()?.questionType || elements.questionTypeSelect?.value;
+            const options = questionType === 'true_false' ? ['Ｏ', 'Ｘ'] : ['', '', '', ''];
+            state.setGeneratedQuestions([...state.getGeneratedQuestions(), {
+                text: '',
+                options,
+                correct: [0],
+                bloomLevel: 'understand',
+                explanation: '',
+                design_concept: '',
+                time: 30
+            }]);
+            ui.showToast(ui.t('toast_custom_question_added'), 'success');
+            requestAnimationFrame(() => elements.questionsContainer?.lastElementChild?.querySelector('.question-text-area')?.focus());
+        }, 'addCustomQuestionBtn');
         
         // 分析
         bind(elements.analyzeContentBtn, 'click', AnalyzerHandlers.handleAnalyzeContent, 'analyzeContentBtn');
