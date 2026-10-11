@@ -163,11 +163,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!radio) return;
             radio.checked = true;
             localStorage.setItem('quizGenTheme_v1', theme);
+            document.body.dataset.theme = theme;
             syncThemeMenu();
             closeThemeMenu();
             themeTrigger?.focus();
         }));
         syncThemeMenu();
+
+        bind(elements.formatSelect, 'change', ui.syncExportFormatButtons, 'formatButtonSync');
+        document.querySelectorAll('[data-format-value]').forEach(button => bind(button, 'click', () => {
+            if (!elements.formatSelect) return;
+            elements.formatSelect.value = button.dataset.formatValue;
+            elements.formatSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }));
+        ui.syncExportFormatButtons();
+
+        const syncPreviewHeight = () => {
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+            if (!isDesktop) {
+                elements.previewColumn?.style.removeProperty('height');
+                return;
+            }
+            if (elements.controlsColumn && elements.previewColumn) {
+                elements.previewColumn.style.height = `${elements.controlsColumn.getBoundingClientRect().height}px`;
+            }
+        };
+        if (elements.controlsColumn && elements.previewColumn) {
+            if ('ResizeObserver' in window) new ResizeObserver(syncPreviewHeight).observe(elements.controlsColumn);
+            window.addEventListener('resize', syncPreviewHeight);
+            requestAnimationFrame(syncPreviewHeight);
+        }
         bind(document, 'click', e => {
             if (!e.target.closest('.header-theme-control')) closeThemeMenu();
         }, 'closeThemeOutside');
@@ -347,14 +372,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.showToast('API Key 已清除', 'success');
         }, 'clearApiKeyBtn');
         
-        bind(elements.toggleApiStepsBtn, 'click', () => {
-            if (elements.apiStepsContainer && elements.apiStepsArrow) {
-                elements.apiStepsContainer.classList.toggle('hidden');
-                elements.apiStepsArrow.classList.toggle('rotate-180');
-                elements.toggleApiStepsBtn.setAttribute('aria-expanded', String(!elements.apiStepsContainer.classList.contains('hidden')));
-            }
-        }, 'toggleApiStepsBtn');
-
         bind(elements.toggleApiKeyVisibilityBtn, 'click', () => {
             if (elements.apiKeyInput) {
                 // 文字框改用 class 切換遮罩
@@ -407,7 +424,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (id === 'library') LibHandlers.refreshLibrary();
         }));
         bind(document.getElementById('header-library-btn'), 'click', () => {
-            document.getElementById('work-tab-library')?.click();
+            const isLibraryOpen = !document.getElementById('work-content-library')?.classList.contains('hidden');
+            if (isLibraryOpen) {
+                ui.switchWorkTab('edit');
+                return;
+            }
+            ui.switchWorkTab('library');
+            LibHandlers.refreshLibrary();
         }, 'headerLibraryBtn');
 
         // 學生程度連動 (治本版：事件委派)
@@ -447,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------
     safeExecute('Final Post-Init', () => {
         SessionHandlers.restoreDraft();
+        ui.syncExportFormatButtons();
         SessionHandlers.bindAutoSave();
         SessionHandlers.checkContentAndToggleButton();
         ui.updateRegenerateButtonState();

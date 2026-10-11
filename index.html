@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" href="Logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css?v=workbench-redesign-2">
+    <link rel="stylesheet" href="style.css?v=workbench-redesign-5">
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -464,24 +464,6 @@
                                     <option value="competency-based" data-i18n="style_competency">✨ 素養導向型</option>
                                 </select>
                             </div>
-                            <div>
-                                <label for="format-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5 themed-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    <span data-i18n="export_format_label">匯出格式</span>
-                                </label>
-                                <select id="format-select" class="block w-full p-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
-                                    <option value="" disabled selected data-i18n="format_placeholder">請選擇格式</option>
-                                    <option value="wordwall" data-i18n="format_wordwall">Wordwall (Excel)</option>
-                                    <option value="kahoot" data-i18n="format_kahoot">Kahoot (Excel)</option>
-                                    <option value="wayground" data-i18n="format_wayground">Wayground (Excel)</option>
-                                    <option value="loilonote" data-i18n="format_loilonote">LoiLoNote (Excel)</option>
-                                    <option value="blooket" data-i18n="format_blooket">Blooket (CSV)</option>
-                                    <option value="gimkit" data-i18n="format_gimkit">Gimkit (CSV)</option>
-                                    <option value="pdf" data-i18n="format_pdf">PDF 考卷 (A4)</option>
-                                    <option value="txt" data-i18n="format_txt">純文字檔 (.txt)</option>
-                                </select>
-                            </div>
-
                             <!-- [Phase 4.2] 素養情境選單 (全寬) -->
                             <div id="competency-context-container" class="hidden sm:col-span-3">
                                 <label for="context-type-select" class="flex items-center text-sm font-medium text-gray-700 mb-1">
@@ -545,15 +527,35 @@
 
                 
                 <div id="preview-column" class="lg:w-3/5 themed-card bg-white p-6 rounded-2xl shadow-lg border relative min-h-[500px] flex flex-col">
+                    <div id="format-toolbar" class="format-toolbar">
+                        <span id="format-switch-label" class="format-toolbar-label" data-i18n="format_switch_label">格式切換：</span>
+                        <div class="format-options" role="group" aria-labelledby="format-switch-label">
+                            <button type="button" data-format-value="wordwall" aria-pressed="false" data-i18n="format_wordwall">Wordwall (Excel)</button>
+                            <button type="button" data-format-value="kahoot" aria-pressed="false" data-i18n="format_kahoot">Kahoot! (Excel)</button>
+                            <button type="button" data-format-value="wayground" aria-pressed="false" data-i18n="format_wayground">Wayground (Excel)</button>
+                            <button type="button" data-format-value="loilonote" aria-pressed="false" data-i18n="format_loilonote">LoiLoNote (Excel)</button>
+                            <button type="button" data-format-value="blooket" aria-pressed="false" data-i18n="format_blooket">Blooket (CSV)</button>
+                            <button type="button" data-format-value="gimkit" aria-pressed="false" data-i18n="format_gimkit">Gimkit (CSV)</button>
+                            <button type="button" data-format-value="pdf" aria-pressed="false" data-i18n="format_pdf">PDF 考卷 (A4)</button>
+                            <button type="button" data-format-value="txt" aria-pressed="false" data-i18n="format_txt">純文字檔 (.txt)</button>
+                        </div>
+                        <select id="format-select" class="sr-only" tabindex="-1" aria-hidden="true">
+                            <option value="" disabled selected data-i18n="format_placeholder">請選擇格式</option>
+                            <option value="wordwall" data-i18n="format_wordwall">Wordwall (Excel)</option>
+                            <option value="kahoot" data-i18n="format_kahoot">Kahoot (Excel)</option>
+                            <option value="wayground" data-i18n="format_wayground">Wayground (Excel)</option>
+                            <option value="loilonote" data-i18n="format_loilonote">LoiLoNote (Excel)</option>
+                            <option value="blooket" data-i18n="format_blooket">Blooket (CSV)</option>
+                            <option value="gimkit" data-i18n="format_gimkit">Gimkit (CSV)</option>
+                            <option value="pdf" data-i18n="format_pdf">PDF 考卷 (A4)</option>
+                            <option value="txt" data-i18n="format_txt">純文字檔 (.txt)</option>
+                        </select>
+                    </div>
                     <div class="border-b border-gray-200 mb-5">
                         <nav class="-mb-px flex space-x-6">
                             <button id="work-tab-edit" class="work-tab-btn active flex items-center pb-3 text-lg font-bold">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                 <span data-i18n="tab_edit">編輯試卷</span>
-                            </button>
-                            <button id="work-tab-library" class="work-tab-btn flex items-center pb-3 text-lg font-bold">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-                                <span data-i18n="tab_community">題庫大廳</span>
                             </button>
                         </nav>
                     </div>
@@ -651,19 +653,7 @@
                     </div>
                     <div class="api-key-help-row">
                         <p data-i18n="api_project_hint">多組金鑰請使用不同 Google 專案；同專案金鑰共用配額。</p>
-                        <button type="button" id="toggle-api-steps-btn" aria-expanded="false" aria-controls="api-steps-container"><span data-i18n="api_steps_btn">操作步驟</span><svg id="api-steps-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg></button>
-                    </div>
-                    <div id="api-steps-container" class="api-steps-panel hidden">
-                        <strong data-i18n="api_steps_title">取得 Gemini API Key 步驟：</strong>
-                        <ol>
-                            <li data-i18n="api_step_1">登入您的 Google 帳號。</li>
-                            <li data-i18n-html="api_step_2">前往 Google AI Studio。</li>
-                            <li data-i18n-html="api_step_3">點擊頁面左下方的 Get API key 按鈕。</li>
-                            <li data-i18n-html="api_step_4">點擊頁面右上角藍色的 Create API key 按鈕。</li>
-                            <li data-i18n-html="api_step_5">選擇專案；若無專案，請先建立。</li>
-                            <li data-i18n-html="api_step_6">為您的 API Key 命名（選用）。</li>
-                            <li data-i18n-html="api_step_7">複製生成的金鑰，貼入上方欄位。</li>
-                        </ol>
+                        <a href="https://youtu.be/9iqluTyt82c" target="_blank" rel="noopener noreferrer" data-i18n="api_video_tutorial">申請 API Key 教學影片</a>
                     </div>
 
                     <div class="api-storage-notice">
@@ -676,7 +666,7 @@
                     <button id="clear-api-key-btn" type="button" class="api-clear-btn" data-i18n="api_clear_saved">清除已儲存金鑰</button>
                     <div class="api-settings-footer-actions">
                         <button id="close-api-settings-btn" type="button" class="api-close-btn" data-i18n="close_btn">關閉</button>
-                        <button id="save-api-key-btn" type="button" class="api-save-btn themed-button-primary" data-i18n="api_save_settings">儲存常用設定</button>
+                        <button id="save-api-key-btn" type="button" class="api-save-btn themed-button-primary" data-i18n="api_save_settings">儲存並套用金鑰</button>
                     </div>
                 </div>
             </div>
@@ -864,6 +854,6 @@
         </div>
     </template>
 
-    <script src="main.js?v=20261010R1-ui2" type="module"></script>
+    <script src="main.js?v=20261010R1-ui3" type="module"></script>
 </body>
 </html>

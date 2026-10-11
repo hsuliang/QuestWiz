@@ -8,9 +8,6 @@ export const elements = {
     get saveApiKeyBtn() { return document.getElementById('save-api-key-btn'); },
     get clearApiKeyBtn() { return document.getElementById('clear-api-key-btn'); },
     get toggleApiKeyVisibilityBtn() { return document.getElementById('toggle-api-key-visibility'); },
-    get toggleApiStepsBtn() { return document.getElementById('toggle-api-steps-btn'); },
-    get apiStepsContainer() { return document.getElementById('api-steps-container'); },
-    get apiStepsArrow() { return document.getElementById('api-steps-arrow'); },
     get themeRadios() { return document.querySelectorAll('input[name="theme"]'); },
     get mainContainer() { return document.getElementById('main-container'); },
 

@@ -725,9 +725,11 @@ export async function triggerQuestionGeneration() {
     // Validate Export Format
     if (!elements.formatSelect.value) {
         ui.showToast(ui.t('toast_select_format'), 'error');
-        elements.formatSelect.focus();
-        elements.formatSelect.classList.add('input-error');
-        setTimeout(() => elements.formatSelect.classList.remove('input-error'), 2000);
+        const firstFormatButton = document.querySelector('[data-format-value]');
+        const toolbar = document.getElementById('format-toolbar');
+        firstFormatButton?.focus();
+        toolbar?.classList.add('input-error');
+        setTimeout(() => toolbar?.classList.remove('input-error'), 2000);
         return;
     }
 

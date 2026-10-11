@@ -192,7 +192,19 @@ export function applyLayoutPreference() {
 export function applyThemePreference() {
     const theme = localStorage.getItem('quizGenTheme_v1') || 'lavender';
     const radio = document.getElementById(`theme-${theme}`);
-    if (radio) radio.checked = true;
+    if (radio) {
+        radio.checked = true;
+        document.body.dataset.theme = theme;
+    }
+}
+
+export function syncExportFormatButtons() {
+    const format = elements.formatSelect?.value || '';
+    document.querySelectorAll('[data-format-value]').forEach(button => {
+        const selected = button.dataset.formatValue === format;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+    });
 }
 
 export function populateVersionHistory() {
@@ -341,7 +353,10 @@ export function updateLanguage(lang) {
     document.documentElement.lang = lang;
     localStorage.setItem('quizGenLanguage_v1', lang);
     document.querySelectorAll('input[name="language"]').forEach(r => { r.checked = (r.value === lang); });
+    const libraryButtonLabel = document.querySelector('#header-library-btn .app-library-label');
+    if (libraryButtonLabel) document.getElementById('header-library-btn')?.setAttribute('aria-label', libraryButtonLabel.textContent);
     updateApiKeyBadge();
+    syncExportFormatButtons();
 }
 
 export function initLanguage() {
