@@ -92,10 +92,35 @@ export function stopKeyTimer() {
     if (display) display.style.display = 'none';
 }
 
+export function updateApiKeyBadge() {
+    let count = 0;
+    try {
+        const data = JSON.parse(sessionStorage.getItem('gemini_api_key_data') || 'null');
+        if (data && Date.now() < data.expires) {
+            const values = Array.isArray(data.value) ? data.value : [data.value];
+            count = new Set(values.filter(Boolean)).size;
+        }
+    } catch { /* Invalid session data is treated as empty. */ }
+
+    const countEl = document.getElementById('header-api-key-count');
+    if (countEl) countEl.textContent = String(count);
+    document.querySelector('.app-api-key-count')?.classList.toggle('is-empty', count === 0);
+
+    const status = document.getElementById('api-modal-status-text');
+    if (status) {
+        const isEnglish = (localStorage.getItem('quizGenLanguage_v1') || 'zh-TW') === 'en';
+        status.textContent = count === 0
+            ? (isEnglish ? 'No keys saved' : '尚未設定金鑰')
+            : (isEnglish ? `${count} ${count === 1 ? 'key' : 'keys'} ready` : `${count} 組已就緒`);
+        status.parentElement?.classList.toggle('is-empty', count === 0);
+    }
+}
+
 export function startKeyTimer(expirationTime) {
     const display = document.getElementById('api-key-timer');
     if (!display) return;
     clearInterval(state.getKeyTimerInterval());
+    updateApiKeyBadge();
     display.style.display = 'inline';
     display.classList.remove('text-green-600', 'text-red-600'); // Reset colors
     
@@ -106,6 +131,7 @@ export function startKeyTimer(expirationTime) {
             display.classList.add('text-red-600');
             // stopKeyTimer(); // Don't stop immediately, let user see it expired
             getApiKey(); // Trigger cleanup if needed
+            updateApiKeyBadge();
             return; 
         }
         const h = Math.floor((rem / 3600000) % 24).toString().padStart(2, '0');
@@ -303,10 +329,19 @@ export function updateLanguage(lang) {
             el.textContent = translations[lang][k];
         }
     });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const value = translations[lang][el.getAttribute('data-i18n-placeholder')];
+        if (value) el.placeholder = value;
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        const value = translations[lang][el.getAttribute('data-i18n-html')];
+        if (value) el.innerHTML = value;
+    });
     refreshUI();
     document.documentElement.lang = lang;
     localStorage.setItem('quizGenLanguage_v1', lang);
     document.querySelectorAll('input[name="language"]').forEach(r => { r.checked = (r.value === lang); });
+    updateApiKeyBadge();
 }
 
 export function initLanguage() {

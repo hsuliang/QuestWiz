@@ -8,8 +8,6 @@ export const elements = {
     get saveApiKeyBtn() { return document.getElementById('save-api-key-btn'); },
     get clearApiKeyBtn() { return document.getElementById('clear-api-key-btn'); },
     get toggleApiKeyVisibilityBtn() { return document.getElementById('toggle-api-key-visibility'); },
-    get collapseSettingsBtn() { return document.getElementById('collapse-settings-btn'); },
-    get commonSettingsCard() { return document.getElementById('common-settings-card'); },
     get toggleApiStepsBtn() { return document.getElementById('toggle-api-steps-btn'); },
     get apiStepsContainer() { return document.getElementById('api-steps-container'); },
     get apiStepsArrow() { return document.getElementById('api-steps-arrow'); },
@@ -40,7 +38,7 @@ export const elements = {
     get generateContentBtn() { return document.getElementById('generate-content-btn'); },
     get extractFromUrlBtn() { return document.getElementById('extract-from-url-btn'); },
     get editPromptBtn() { return document.getElementById('edit-prompt-btn'); },
-    get studentLevelSelectContent() { return document.getElementById('student-level-select'); }, // [Fix] 補回遺失的引用
+    get studentLevelSelectContent() { return document.getElementById('student-level-select-content'); },
     get adaptiveWordCount() { return document.getElementById('adaptive-word-count'); }, // [Phase 2]
     get domainSelectContent() { return document.getElementById('domain-select-content'); }, // [Phase 4.2]
     get readingTimeBadge() { return document.getElementById('reading-time-badge'); }, // [Phase 4.2]
@@ -129,10 +127,6 @@ export const elements = {
     // Tabs 系統
     get tabs() {
         return {
-            settings: {
-                get buttons() { return document.querySelectorAll('.settings-tab-btn'); },
-                get contents() { return document.querySelectorAll('.settings-tab-content'); }
-            },
             input: {
                 get buttons() { return document.querySelectorAll('.tab-btn'); },
                 get contents() { return document.querySelectorAll('.tab-content'); }

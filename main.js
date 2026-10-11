@@ -119,6 +119,67 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     safeExecute('Event Bindings', () => {
+        const apiModal = document.getElementById('api-settings-modal');
+        const apiTrigger = document.getElementById('header-api-key-btn');
+        const themeTrigger = document.getElementById('header-theme-btn');
+        const themeMenu = document.getElementById('header-theme-menu');
+        let modalReturnFocus = null;
+        const closeThemeMenu = () => {
+            themeMenu?.classList.add('hidden');
+            themeTrigger?.setAttribute('aria-expanded', 'false');
+        };
+        const closeApiSettings = () => {
+            apiModal?.classList.add('hidden');
+            apiModal?.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('api-modal-open');
+            modalReturnFocus?.focus();
+        };
+        bind(apiTrigger, 'click', () => {
+            closeThemeMenu();
+            modalReturnFocus = document.activeElement;
+            apiModal?.classList.remove('hidden');
+            apiModal?.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('api-modal-open');
+            document.getElementById('close-api-settings-x')?.focus();
+        }, 'headerApiKeyBtn');
+        bind(document.getElementById('close-api-settings-x'), 'click', closeApiSettings, 'closeApiSettingsX');
+        bind(document.getElementById('close-api-settings-btn'), 'click', closeApiSettings, 'closeApiSettingsBtn');
+        bind(apiModal, 'click', e => { if (e.target === apiModal) closeApiSettings(); }, 'apiSettingsBackdrop');
+        bind(themeTrigger, 'click', () => {
+            const willOpen = themeMenu?.classList.contains('hidden');
+            themeMenu?.classList.toggle('hidden', !willOpen);
+            themeTrigger?.setAttribute('aria-expanded', String(Boolean(willOpen)));
+        }, 'headerThemeBtn');
+        const syncThemeMenu = () => {
+            document.querySelectorAll('[data-theme-option]').forEach(button => {
+                const selected = document.getElementById(`theme-${button.dataset.themeOption}`)?.checked === true;
+                button.classList.toggle('is-selected', selected);
+                button.setAttribute('aria-pressed', String(selected));
+            });
+        };
+        document.querySelectorAll('[data-theme-option]').forEach(button => bind(button, 'click', () => {
+            const theme = button.dataset.themeOption;
+            const radio = document.getElementById(`theme-${theme}`);
+            if (!radio) return;
+            radio.checked = true;
+            localStorage.setItem('quizGenTheme_v1', theme);
+            syncThemeMenu();
+            closeThemeMenu();
+            themeTrigger?.focus();
+        }));
+        syncThemeMenu();
+        bind(document, 'click', e => {
+            if (!e.target.closest('.header-theme-control')) closeThemeMenu();
+        }, 'closeThemeOutside');
+        bind(document, 'keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (apiModal && !apiModal.classList.contains('hidden')) closeApiSettings();
+            else if (themeMenu && !themeMenu.classList.contains('hidden')) {
+                closeThemeMenu();
+                themeTrigger?.focus();
+            }
+        }, 'closeSettingsOnEscape');
+
         bind(document.getElementById('admin-login-btn'), 'click', async () => {
             try {
                 if (state.isAdminMode()) await signOutAdmin();
@@ -240,6 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ui.showToast(msg, 'success');
                     }
                     ui.startKeyTimer(expires);
+                    closeApiSettings();
                     return;
                 }
 
@@ -262,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         ui.showToast(`已儲存 ${networkFailedKeys.length} 組金鑰（未通過線上驗證）`, 'warning');
                         ui.startKeyTimer(expires);
+                        closeApiSettings();
                     }
                     return;
                 }
@@ -279,6 +342,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionStorage.removeItem('gemini_api_key_data');
             api.resetGeminiRouting();
             if (elements.apiKeyInput) elements.apiKeyInput.value = '';
+            ui.stopKeyTimer();
+            ui.updateApiKeyBadge();
             ui.showToast('API Key 已清除', 'success');
         }, 'clearApiKeyBtn');
         
@@ -286,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (elements.apiStepsContainer && elements.apiStepsArrow) {
                 elements.apiStepsContainer.classList.toggle('hidden');
                 elements.apiStepsArrow.classList.toggle('rotate-180');
+                elements.toggleApiStepsBtn.setAttribute('aria-expanded', String(!elements.apiStepsContainer.classList.contains('hidden')));
             }
         }, 'toggleApiStepsBtn');
 
@@ -322,10 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
         bind(elements.versionBtn, 'click', () => ui.showVersionModal(), 'versionBtn');
         bind(elements.closeModalBtn, 'click', () => ui.hideVersionModal(), 'closeModalBtn');
 
-        bind(elements.collapseSettingsBtn, 'click', () => {
-            elements.commonSettingsCard?.classList.toggle('is-collapsed');
-        }, 'collapseSettingsBtn');
-
         bind(elements.toggleBloomBtn, 'click', () => {
             elements.bloomOptionsContainer?.classList.toggle('hidden');
             elements.bloomArrow?.classList.toggle('rotate-180');
@@ -338,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'mobileFab');
 
         // Tabs
-        elements.tabs.settings.buttons?.forEach((btn, i) => bind(btn, 'click', () => ui.switchTab('settings', i)));
         elements.tabs.input.buttons?.forEach((btn, i) => bind(btn, 'click', () => ui.switchTab('input', i)));
         elements.workTabs.buttons?.forEach((btn, i) => bind(btn, 'click', () => {
             const id = i === 0 ? 'edit' : 'library';
