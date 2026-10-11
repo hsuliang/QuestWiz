@@ -1,5 +1,5 @@
 import { elements } from './dom.js';
-import * as ui from './ui.js';
+import * as ui from './ui.js?v=20261011R3-ui5';
 import * as utils from './utils.js';
 import * as state from './state.js';
 import * as api from './api.js';
@@ -7,7 +7,7 @@ import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
-import * as GenHandlers from './handlers/generator.js';
+import * as GenHandlers from './handlers/generator.js?v=20261011R3-ui5';
 import * as LibHandlers from './handlers/library.js';
 import * as ContentHandlers from './handlers/content.js';
 import * as AnalyzerHandlers from './handlers/contentAnalyzer.js';
@@ -58,8 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ui.initializeSortable();
                     }
                 } else if (key === 'quizSummary') {
-                    if (value) ui.renderQuizSummary(value);
-                    else document.getElementById('quiz-summary-card')?.remove();
+                    ui.renderQuizSummary(value);
+                    ui.renderQuizResultHeader(state.getGeneratedQuestions(), value);
                 } else if (key === 'selectedKeywords') {
                     AnalyzerHandlers.updateHighlighter();
                     if (ui.refreshUI) ui.refreshUI();
@@ -119,6 +119,92 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     safeExecute('Event Bindings', () => {
+        const apiModal = document.getElementById('api-settings-modal');
+        const apiTrigger = document.getElementById('header-api-key-btn');
+        const themeTrigger = document.getElementById('header-theme-btn');
+        const themeMenu = document.getElementById('header-theme-menu');
+        let modalReturnFocus = null;
+        const closeThemeMenu = () => {
+            themeMenu?.classList.add('hidden');
+            themeTrigger?.setAttribute('aria-expanded', 'false');
+        };
+        const closeApiSettings = () => {
+            apiModal?.classList.add('hidden');
+            apiModal?.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('api-modal-open');
+            modalReturnFocus?.focus();
+        };
+        bind(apiTrigger, 'click', () => {
+            closeThemeMenu();
+            modalReturnFocus = document.activeElement;
+            apiModal?.classList.remove('hidden');
+            apiModal?.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('api-modal-open');
+            document.getElementById('close-api-settings-x')?.focus();
+        }, 'headerApiKeyBtn');
+        bind(document.getElementById('close-api-settings-x'), 'click', closeApiSettings, 'closeApiSettingsX');
+        bind(document.getElementById('close-api-settings-btn'), 'click', closeApiSettings, 'closeApiSettingsBtn');
+        bind(apiModal, 'click', e => { if (e.target === apiModal) closeApiSettings(); }, 'apiSettingsBackdrop');
+        bind(themeTrigger, 'click', () => {
+            const willOpen = themeMenu?.classList.contains('hidden');
+            themeMenu?.classList.toggle('hidden', !willOpen);
+            themeTrigger?.setAttribute('aria-expanded', String(Boolean(willOpen)));
+        }, 'headerThemeBtn');
+        const syncThemeMenu = () => {
+            document.querySelectorAll('[data-theme-option]').forEach(button => {
+                const selected = document.getElementById(`theme-${button.dataset.themeOption}`)?.checked === true;
+                button.classList.toggle('is-selected', selected);
+                button.setAttribute('aria-pressed', String(selected));
+            });
+        };
+        document.querySelectorAll('[data-theme-option]').forEach(button => bind(button, 'click', () => {
+            const theme = button.dataset.themeOption;
+            const radio = document.getElementById(`theme-${theme}`);
+            if (!radio) return;
+            radio.checked = true;
+            localStorage.setItem('quizGenTheme_v1', theme);
+            document.body.dataset.theme = theme;
+            syncThemeMenu();
+            closeThemeMenu();
+            themeTrigger?.focus();
+        }));
+        syncThemeMenu();
+
+        bind(elements.formatSelect, 'change', ui.syncExportFormatButtons, 'formatButtonSync');
+        document.querySelectorAll('[data-format-value]').forEach(button => bind(button, 'click', () => {
+            if (!elements.formatSelect) return;
+            elements.formatSelect.value = button.dataset.formatValue;
+            elements.formatSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }));
+        ui.syncExportFormatButtons();
+
+        const syncPreviewHeight = () => {
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+            if (!isDesktop) {
+                elements.previewColumn?.style.removeProperty('height');
+                return;
+            }
+            if (elements.controlsColumn && elements.previewColumn) {
+                elements.previewColumn.style.height = `${elements.controlsColumn.getBoundingClientRect().height}px`;
+            }
+        };
+        if (elements.controlsColumn && elements.previewColumn) {
+            if ('ResizeObserver' in window) new ResizeObserver(syncPreviewHeight).observe(elements.controlsColumn);
+            window.addEventListener('resize', syncPreviewHeight);
+            requestAnimationFrame(syncPreviewHeight);
+        }
+        bind(document, 'click', e => {
+            if (!e.target.closest('.header-theme-control')) closeThemeMenu();
+        }, 'closeThemeOutside');
+        bind(document, 'keydown', e => {
+            if (e.key !== 'Escape') return;
+            if (apiModal && !apiModal.classList.contains('hidden')) closeApiSettings();
+            else if (themeMenu && !themeMenu.classList.contains('hidden')) {
+                closeThemeMenu();
+                themeTrigger?.focus();
+            }
+        }, 'closeSettingsOnEscape');
+
         bind(document.getElementById('admin-login-btn'), 'click', async () => {
             try {
                 if (state.isAdminMode()) await signOutAdmin();
@@ -131,6 +217,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // 出題
         bind(elements.regenerateBtn, 'click', () => { ui.showLoader('AI正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'regenerateBtn');
         bind(elements.expertGenerateBtn, 'click', () => { ui.showLoader('專家模式正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'expertGenerateBtn');
+        bind(document.getElementById('result-regenerate-btn'), 'click', () => elements.regenerateBtn?.click(), 'resultRegenerateBtn');
+        bind(elements.quizTitleInput, 'input', (event) => {
+            const summary = state.getQuizSummary();
+            ui.renderQuizResultHeader(state.getGeneratedQuestions(), summary ? { ...summary, title: event.target.value.trim() } : summary);
+        }, 'quizTitleInput');
+        bind(document.getElementById('add-custom-question-btn'), 'click', () => {
+            const questionType = state.getQuizSummary()?.questionType || elements.questionTypeSelect?.value;
+            const options = questionType === 'true_false' ? ['Ｏ', 'Ｘ'] : ['', '', '', ''];
+            state.setGeneratedQuestions([...state.getGeneratedQuestions(), {
+                text: '',
+                options,
+                correct: [0],
+                bloomLevel: 'understand',
+                explanation: '',
+                design_concept: '',
+                time: 30
+            }]);
+            ui.showToast(ui.t('toast_custom_question_added'), 'success');
+            requestAnimationFrame(() => elements.questionsContainer?.lastElementChild?.querySelector('.question-text-area')?.focus());
+        }, 'addCustomQuestionBtn');
         
         // 分析
         bind(elements.analyzeContentBtn, 'click', AnalyzerHandlers.handleAnalyzeContent, 'analyzeContentBtn');
@@ -240,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ui.showToast(msg, 'success');
                     }
                     ui.startKeyTimer(expires);
+                    closeApiSettings();
                     return;
                 }
 
@@ -262,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         ui.showToast(`已儲存 ${networkFailedKeys.length} 組金鑰（未通過線上驗證）`, 'warning');
                         ui.startKeyTimer(expires);
+                        closeApiSettings();
                     }
                     return;
                 }
@@ -279,16 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionStorage.removeItem('gemini_api_key_data');
             api.resetGeminiRouting();
             if (elements.apiKeyInput) elements.apiKeyInput.value = '';
+            ui.stopKeyTimer();
+            ui.updateApiKeyBadge();
             ui.showToast('API Key 已清除', 'success');
         }, 'clearApiKeyBtn');
         
-        bind(elements.toggleApiStepsBtn, 'click', () => {
-            if (elements.apiStepsContainer && elements.apiStepsArrow) {
-                elements.apiStepsContainer.classList.toggle('hidden');
-                elements.apiStepsArrow.classList.toggle('rotate-180');
-            }
-        }, 'toggleApiStepsBtn');
-
         bind(elements.toggleApiKeyVisibilityBtn, 'click', () => {
             if (elements.apiKeyInput) {
                 // 文字框改用 class 切換遮罩
@@ -322,10 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
         bind(elements.versionBtn, 'click', () => ui.showVersionModal(), 'versionBtn');
         bind(elements.closeModalBtn, 'click', () => ui.hideVersionModal(), 'closeModalBtn');
 
-        bind(elements.collapseSettingsBtn, 'click', () => {
-            elements.commonSettingsCard?.classList.toggle('is-collapsed');
-        }, 'collapseSettingsBtn');
-
         bind(elements.toggleBloomBtn, 'click', () => {
             elements.bloomOptionsContainer?.classList.toggle('hidden');
             elements.bloomArrow?.classList.toggle('rotate-180');
@@ -338,13 +437,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'mobileFab');
 
         // Tabs
-        elements.tabs.settings.buttons?.forEach((btn, i) => bind(btn, 'click', () => ui.switchTab('settings', i)));
         elements.tabs.input.buttons?.forEach((btn, i) => bind(btn, 'click', () => ui.switchTab('input', i)));
         elements.workTabs.buttons?.forEach((btn, i) => bind(btn, 'click', () => {
             const id = i === 0 ? 'edit' : 'library';
             ui.switchWorkTab(id);
             if (id === 'library') LibHandlers.refreshLibrary();
         }));
+        bind(document.getElementById('header-library-btn'), 'click', () => {
+            const isLibraryOpen = !document.getElementById('work-content-library')?.classList.contains('hidden');
+            if (isLibraryOpen) {
+                ui.switchWorkTab('edit');
+                return;
+            }
+            ui.switchWorkTab('library');
+            LibHandlers.refreshLibrary();
+        }, 'headerLibraryBtn');
 
         // 學生程度連動 (治本版：事件委派)
         const updateAllLevels = (val) => {
@@ -383,6 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------
     safeExecute('Final Post-Init', () => {
         SessionHandlers.restoreDraft();
+        ui.syncExportFormatButtons();
         SessionHandlers.bindAutoSave();
         SessionHandlers.checkContentAndToggleButton();
         ui.updateRegenerateButtonState();

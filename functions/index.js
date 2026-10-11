@@ -8,6 +8,7 @@ const { Readability } = require("@mozilla/readability");
 admin.initializeApp();
 
 const db = admin.firestore();
+const VISITOR_COUNT_BASE = 15000;
 
 // 全域設定：統一設定區域為 asia-east1
 setGlobalOptions({ region: "asia-east1" });
@@ -135,7 +136,35 @@ exports.getContent = onRequest({ cors: true }, async (req, res) => {
 });
 
 /**
- * 4. 管理員刪除功能
+ * 4. 記錄網站瀏覽次數
+ */
+exports.trackVisitorCount = onRequest({ cors: true }, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (req.method !== "GET") return res.status(405).send("Method Not Allowed");
+
+    const counterRef = db.collection("site_metrics").doc("visitor_count");
+    try {
+      const count = await db.runTransaction(async transaction => {
+        const snapshot = await transaction.get(counterRef);
+        const previousCount = Number(snapshot.get("count"));
+        const nextCount = snapshot.exists && Number.isFinite(previousCount) && previousCount >= VISITOR_COUNT_BASE
+          ? previousCount + 1
+          : VISITOR_COUNT_BASE;
+        transaction.set(counterRef, {
+          count: nextCount,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return nextCount;
+      });
+      return res.status(200).json({ count });
+    } catch (error) {
+      console.error("TrackVisitorCount error:", error);
+      return res.status(500).json({ error: "Unable to update visitor count." });
+    }
+});
+
+/**
+ * 5. 管理員刪除功能
  */
 exports.deleteQuizAsAdmin = onRequest({ cors: true }, async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method Not Allowed");

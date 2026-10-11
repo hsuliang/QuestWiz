@@ -722,15 +722,6 @@ export async function triggerQuestionGeneration() {
         return;
     }
 
-    // Validate Export Format
-    if (!elements.formatSelect.value) {
-        ui.showToast(ui.t('toast_select_format'), 'error');
-        elements.formatSelect.focus();
-        elements.formatSelect.classList.add('input-error');
-        setTimeout(() => elements.formatSelect.classList.remove('input-error'), 2000);
-        return;
-    }
-
     const tabImage = elements.tabs.input.buttons[1];
     if (tabImage && tabImage.classList.contains('active') && state.getUploadedImages().length === 0) {
         return ui.showToast(ui.t('toast_upload_img_first'), 'error');
@@ -767,6 +758,7 @@ async function proceedWithGeneration(languageChoice) {
     if ((!text.trim() && state.getUploadedImages().length === 0) || totalQuestions <= 0) {
         if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
         if (elements.previewActions) elements.previewActions.classList.add('hidden');
+        document.getElementById('format-toolbar')?.classList.add('hidden');
         if (elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
         return;
     }
@@ -786,6 +778,7 @@ async function proceedWithGeneration(languageChoice) {
 
     if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
     if (elements.previewActions) elements.previewActions.classList.add('hidden');
+    document.getElementById('format-toolbar')?.classList.add('hidden');
     
     let allGeneratedQs = [];
     try {
@@ -820,6 +813,7 @@ async function proceedWithGeneration(languageChoice) {
          }
          ui.showToast(userFriendlyMessage, 'error');
          if (elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+         document.getElementById('format-toolbar')?.classList.add('hidden');
          if (elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
     } finally {
         clearInterval(loaderInterval); // 停止輪播
@@ -1340,6 +1334,7 @@ export function clearAllInputs() {
 
     state.setGeneratedQuestions([]);
     if(elements.questionsContainer) elements.questionsContainer.innerHTML = '';
+    document.getElementById('format-toolbar')?.classList.add('hidden');
     if(elements.previewPlaceholder) elements.previewPlaceholder.classList.remove('hidden');
     
     localStorage.removeItem('questwiz_draft_inputs_v1'); // 清除草稿

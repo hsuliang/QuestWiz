@@ -4,12 +4,12 @@ import * as state from './state.js';
 import * as EditorHandlers from './handlers/editor.js';
 import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js';
-import { TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js';
-import { translations } from './translations.js';
+import { CONFIG, TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js?v=20261011R3-ui5';
+import { translations } from './translations.js?v=20261011R3-ui5';
 import { refreshUI } from './view/sync.js';
 
 // Import View Layer
-import * as view from './view/index.js';
+import * as view from './view/index.js?build=ui-result-20261011-r2';
 
 // Re-export standard view functions for backward compatibility
 export { refreshUI };
@@ -22,6 +22,7 @@ export const switchWorkTab = view.switchWorkTab;
 export const switchTab = view.switchTab;
 export const showLibraryLoader = view.showLibraryLoader;
 export const renderQuizSummary = view.renderQuizSummary;
+export const renderQuizResultHeader = view.renderQuizResultHeader;
 export const showPromptModal = view.showPromptModal;
 export const hidePromptModal = view.hidePromptModal;
 export const showShareModal = view.showShareModal;
@@ -79,6 +80,7 @@ export function renderQuestionsForEditing(questions) {
             showToast(t('toast_copy_success'), 'success');
         }
     });
+    view.renderQuizResultHeader(questions, state.getQuizSummary());
     initializeSortable(); // 重點：重新渲染後必須重啟拖曳
 }
 
@@ -92,10 +94,35 @@ export function stopKeyTimer() {
     if (display) display.style.display = 'none';
 }
 
+export function updateApiKeyBadge() {
+    let count = 0;
+    try {
+        const data = JSON.parse(sessionStorage.getItem('gemini_api_key_data') || 'null');
+        if (data && Date.now() < data.expires) {
+            const values = Array.isArray(data.value) ? data.value : [data.value];
+            count = new Set(values.filter(Boolean)).size;
+        }
+    } catch { /* Invalid session data is treated as empty. */ }
+
+    const countEl = document.getElementById('header-api-key-count');
+    if (countEl) countEl.textContent = String(count);
+    document.querySelector('.app-api-key-count')?.classList.toggle('is-empty', count === 0);
+
+    const status = document.getElementById('api-modal-status-text');
+    if (status) {
+        const isEnglish = (localStorage.getItem('quizGenLanguage_v1') || 'zh-TW') === 'en';
+        status.textContent = count === 0
+            ? (isEnglish ? 'No keys saved' : '尚未設定金鑰')
+            : (isEnglish ? `${count} ${count === 1 ? 'key' : 'keys'} ready` : `${count} 組已就緒`);
+        status.parentElement?.classList.toggle('is-empty', count === 0);
+    }
+}
+
 export function startKeyTimer(expirationTime) {
     const display = document.getElementById('api-key-timer');
     if (!display) return;
     clearInterval(state.getKeyTimerInterval());
+    updateApiKeyBadge();
     display.style.display = 'inline';
     display.classList.remove('text-green-600', 'text-red-600'); // Reset colors
     
@@ -106,6 +133,7 @@ export function startKeyTimer(expirationTime) {
             display.classList.add('text-red-600');
             // stopKeyTimer(); // Don't stop immediately, let user see it expired
             getApiKey(); // Trigger cleanup if needed
+            updateApiKeyBadge();
             return; 
         }
         const h = Math.floor((rem / 3600000) % 24).toString().padStart(2, '0');
@@ -166,7 +194,19 @@ export function applyLayoutPreference() {
 export function applyThemePreference() {
     const theme = localStorage.getItem('quizGenTheme_v1') || 'lavender';
     const radio = document.getElementById(`theme-${theme}`);
-    if (radio) radio.checked = true;
+    if (radio) {
+        radio.checked = true;
+        document.body.dataset.theme = theme;
+    }
+}
+
+export function syncExportFormatButtons() {
+    const format = elements.formatSelect?.value || '';
+    document.querySelectorAll('[data-format-value]').forEach(button => {
+        const selected = button.dataset.formatValue === format;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
+    });
 }
 
 export function populateVersionHistory() {
@@ -243,11 +283,27 @@ export function populateVersionHistory() {
 export async function updateVisitorCount() {
     const el = document.getElementById('visitor-counter');
     if (!el) return;
+
+    const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    if (['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)) {
+        el.dataset.status = 'local';
+        el.textContent = translations[language]?.footer_counter_local || 'Local preview';
+        return;
+    }
+
     try {
-        const res = await fetch(`https://api.counterapi.dev/v1/aliang-quiz-gen/main/up`);
+        const res = await fetch(CONFIG.VISITOR_COUNT_FUNCTION_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Counter request failed (${res.status})`);
         const data = await res.json();
-        if (data.count) el.textContent = data.count.toLocaleString();
-    } catch (e) {}
+        const count = Number(data.count);
+        if (!Number.isFinite(count) || count < 0) throw new Error('Counter response has no valid count');
+        el.dataset.status = 'count';
+        el.textContent = count.toLocaleString(language === 'en' ? 'en-US' : 'zh-TW');
+    } catch (error) {
+        el.dataset.status = 'unavailable';
+        el.textContent = translations[language]?.footer_counter_unavailable || 'Counter pending';
+        console.warn('[Visitor Counter] Count is unavailable:', error);
+    }
 }
 
 export function askForLanguageChoice() {
@@ -303,10 +359,28 @@ export function updateLanguage(lang) {
             el.textContent = translations[lang][k];
         }
     });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const value = translations[lang][el.getAttribute('data-i18n-placeholder')];
+        if (value) el.placeholder = value;
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        const value = translations[lang][el.getAttribute('data-i18n-html')];
+        if (value) el.innerHTML = value;
+    });
     refreshUI();
     document.documentElement.lang = lang;
     localStorage.setItem('quizGenLanguage_v1', lang);
+    const counter = document.getElementById('visitor-counter');
+    const counterStatus = counter?.dataset.status;
+    if (counter && counterStatus && counterStatus !== 'count') {
+        counter.textContent = translations[lang][`footer_counter_${counterStatus}`] || counter.textContent;
+    }
+    view.renderQuizResultHeader(state.getGeneratedQuestions(), state.getQuizSummary());
     document.querySelectorAll('input[name="language"]').forEach(r => { r.checked = (r.value === lang); });
+    const libraryButtonLabel = document.querySelector('#header-library-btn .app-library-label');
+    if (libraryButtonLabel) document.getElementById('header-library-btn')?.setAttribute('aria-label', libraryButtonLabel.textContent);
+    updateApiKeyBadge();
+    syncExportFormatButtons();
 }
 
 export function initLanguage() {

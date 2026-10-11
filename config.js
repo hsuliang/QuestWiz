@@ -16,6 +16,7 @@ export const CONFIG = {
     EXTRACT_URL_FUNCTION_URL: 'https://extractcontentfromurl-2xblwpocfa-de.a.run.app',
     GET_YOUTUBE_TRANSCRIPT_URL: 'https://getyoutubetranscript-2xblwpocfa-de.a.run.app',
     DELETE_QUIZ_FUNCTION_URL: 'https://deletequizasadmin-2xblwpocfa-de.a.run.app',
+    VISITOR_COUNT_FUNCTION_URL: 'https://asia-east1-questwiz.cloudfunctions.net/trackVisitorCount',
 
     // Firebase 設定
     FIREBASE_CONFIG: {

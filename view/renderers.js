@@ -1,7 +1,7 @@
 import { elements } from '../dom.js';
 import { QUESTION_STYLE } from '../constants.js';
 import * as state from '../state.js';
-import { translations } from '../translations.js';
+import { translations } from '../translations.js?build=ui-result-20261011';
 import { showToast } from './components.js';
 
 function t(key) {
@@ -123,6 +123,7 @@ function createQuestionElement(q, index, callbacks = {}) {
     const textarea = card.querySelector('.question-text-area');
     if (textarea) {
         textarea.value = q.text || '';
+        textarea.placeholder = t('custom_question_text_placeholder');
         if (callbacks.onUpdateField) {
             textarea.oninput = (e) => callbacks.onUpdateField(index, 'text', e.target.value);
         }
@@ -149,6 +150,7 @@ function createQuestionElement(q, index, callbacks = {}) {
             const optInput = optEl.querySelector('.option-text-input');
             if (optInput) {
                 optInput.value = opt;
+                optInput.placeholder = `${t('custom_question_option_placeholder')} ${String.fromCharCode(65 + optIndex)}`;
                 optInput.dataset.optIndex = optIndex;
                 if (callbacks.onUpdateOption) {
                     optInput.oninput = (e) => callbacks.onUpdateOption(index, optIndex, e.target.value);
@@ -176,12 +178,17 @@ function createQuestionElement(q, index, callbacks = {}) {
 export function renderQuestionsForEditing(questions, callbacks = {}) {
     const container = document.getElementById('questions-container');
     if (!container) return;
+
+    const hasQuestions = Boolean(questions && questions.length > 0);
     
     const placeholder = document.getElementById('preview-placeholder');
-    if (placeholder) placeholder.classList.toggle('hidden', questions && questions.length > 0);
+    if (placeholder) placeholder.classList.toggle('hidden', hasQuestions);
+
+    const formatToolbar = document.getElementById('format-toolbar');
+    if (formatToolbar) formatToolbar.classList.toggle('hidden', !hasQuestions);
 
     const actions = document.getElementById('preview-actions');
-    if (actions) actions.classList.toggle('hidden', !(questions && questions.length > 0));
+    if (actions) actions.classList.toggle('hidden', !hasQuestions);
 
     // 當重置或沒有題目時，隱藏並清空模型徽章容器
     if (!questions || questions.length === 0) {
@@ -234,6 +241,63 @@ export function renderQuestionsForEditing(questions, callbacks = {}) {
         const questionEl = createQuestionElement(q, index, callbacks);
         if (questionEl) container.appendChild(questionEl);
     });
+}
+
+export function renderQuizResultHeader(questions = state.getGeneratedQuestions(), summaryData = state.getQuizSummary()) {
+    const header = document.getElementById('quiz-result-header');
+    if (!header) return;
+
+    if (!questions?.length || (state.isBusy('generate') && !summaryData)) {
+        header.classList.add('hidden');
+        return;
+    }
+
+    header.classList.remove('hidden');
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+        return element;
+    };
+    const language = localStorage.getItem('quizGenLanguage_v1') || 'zh-TW';
+    const domainLabel = summaryData?.domainLabel || elements.domainSelectQuiz?.selectedOptions?.[0]?.textContent?.trim() || t('result_domain_fallback');
+    const studentLevel = summaryData?.studentLevel || elements.studentLevelSelect?.value || '';
+    const gradeLabels = {
+        '1-2': language === 'en' ? 'Elementary (1–2)' : '國小低年級（1–2年級）',
+        '3-4': language === 'en' ? 'Elementary (3–4)' : '國小中年級（3–4年級）',
+        '5-6': language === 'en' ? 'Elementary (5–6)' : '國小高年級（5–6年級）',
+        '7-9': language === 'en' ? 'Junior High (7–9)' : '國中（7–9年級）',
+        '9-12': language === 'en' ? 'High School (9–12)' : '高中（9–12年級）'
+    };
+    const gradeLabel = gradeLabels[studentLevel] || summaryData?.studentLevelLabel || t('result_grade_fallback');
+    const questionStyle = summaryData?.questionStyle || elements.questionStyleSelect?.value || QUESTION_STYLE.KNOWLEDGE_RECALL;
+    const isCompetency = questionStyle === QUESTION_STYLE.COMPETENCY_BASED;
+    const styleBadge = setText('quiz-result-style', t(isCompetency ? 'result_style_competency' : 'result_style_knowledge'));
+    if (styleBadge) styleBadge.classList.toggle('quiz-result-style', isCompetency);
+
+    const contextLabel = summaryData?.contextLabel || elements.contextTypeSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+    const contextBadge = setText('quiz-result-context', contextLabel);
+    contextBadge?.classList.toggle('hidden', !isCompetency || !contextLabel);
+
+    setText('quiz-result-domain', domainLabel || t('result_domain_fallback'));
+    setText('quiz-result-grade', gradeLabel);
+    setText('quiz-result-status', t('result_settings_applied'));
+    setText('quiz-result-title', summaryData?.title || elements.quizTitleInput?.value?.trim() || t('result_title_fallback'));
+
+    const questionTypeKeys = {
+        multiple_choice: 'result_type_multiple_choice',
+        true_false: 'result_type_true_false',
+        mixed: 'result_type_mixed'
+    };
+    const questionType = summaryData?.questionType || elements.questionTypeSelect?.value || 'multiple_choice';
+    const count = questions.length;
+    const points = 100 / count;
+    const pointLabel = Number.isInteger(points) ? String(points) : points.toFixed(1);
+    const overview = t('result_overview_template')
+        .replace('{count}', String(count))
+        .replace('{type}', t(questionTypeKeys[questionType] || questionTypeKeys.multiple_choice))
+        .replace('{points}', pointLabel)
+        .replace('{minutes}', String(Math.max(1, count * 3)));
+    setText('quiz-result-overview', overview);
 }
 
 export function renderQuizSummary(summaryData) {
