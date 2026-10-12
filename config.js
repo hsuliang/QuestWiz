@@ -1,15 +1,16 @@
 // --- 組態常數 ---
 export const CONFIG = {
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-    MODEL_NAME: 'gemini-3.5-flash-lite', // 保留預設值作為回退
+    MODEL_MODE_STORAGE_KEY: 'gemini_model_mode_v1',
+    RATE_LEDGER_STORAGE_KEY: 'questwiz_gemini_rate_ledger_v1',
     MODELS: {
         STANDARD: 'gemini-3.5-flash-lite',
         HIGH_QUALITY: 'gemini-3.8-flash',
-        HIGH_QUALITY_BACKUP: 'gemini-2.5-flash' // [New] 備援模型
     },
     QUOTAS: {
-        STANDARD: { RPM: 15, RPD: 1500, DELAY: 4000 },
-        HIGH_QUALITY: { RPM: 5, RPD: 20, DELAY: 12000 } // 維持高延遲以適應 thinking
+        // 本機安全上限，不是 Google 配額保證；實際值依專案、模型與用量層級變動。
+        STANDARD: { RPM: 12, TPM: 200000, RPD: 400 },
+        HIGH_QUALITY: { RPM: 4, TPM: 120000, RPD: 20 }
     },
     ADD_CONTENT_URL: 'https://addcontent-2xblwpocfa-de.a.run.app',
     VIEW_PAGE_URL: 'view.html',

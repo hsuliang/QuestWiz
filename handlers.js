@@ -1,6 +1,6 @@
 import { CONFIG, contentLoadingMessages, questionLoadingMessages } from './config.js';
 import * as state from './state.js';
-import { getApiKey, generateSingleBatch, fetchWithRetry } from './api.js';
+import { getApiKey, generateSingleBatch, fetchWithRetry } from './api.js?v=20261012-hq-mode-1';
 import * as ui from './ui.js';
 import * as utils from './utils.js'; // Changed to namespace import
 import { elements } from './dom.js';

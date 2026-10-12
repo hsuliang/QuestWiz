@@ -4,16 +4,13 @@
  */
 
 export const SCENARIO_BLOCKS = {
-    // [Level 3] 強制多樣化情境 (原本的全域規則)
-    COMPLEX: `
-4. **Distinct Scenarios**: Use different character names (e.g., Xiao Ming, Xiao Hua, A-Liang) or situational backgrounds for each question. DO NOT reuse the same character or setting unless it's a question set.`,
+    // 素養題只在情境有助於作答時加入必要資訊。
+    COMPETENCY: `
+4. **任務情境**：情境要服務於明確的問題或決定，必須使用題幹資料作答；題幹不得以「根據 XXX」開場，也不得套用「關於 X，下列何者正確」句型。避免無關人物故事。`,
 
-    // [Level 1] 禁止情境 (新規則 - 知識記憶型專用)
+    // 知識記憶題不使用人物故事；應用題可保留必要條件。
     FORBIDDEN: `
-4. **NO Scenarios / No Storytelling**: 
-   - Strictly FORBIDDEN to use characters (e.g., Xiao Ming, Teacher Wang) or situational backgrounds.
-   - Use DIRECT questions only (e.g., "What is...", "Which of the following...", "Compare A and B").
-   - The question must focus purely on the concept itself, stripped of any narrative wrapper.`,
+4. **直接提問**：記憶與理解題直接詢問重要概念或事實；不得以空泛的「根據 XXX」起手，也不得加入人物故事或無關情境。應用題僅加入完成指定認知任務所需的簡短條件。`,
 
     // [Level 2] 簡單情境 (保留給未來擴充)
     SIMPLE: `

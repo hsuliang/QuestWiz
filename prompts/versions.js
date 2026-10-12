@@ -1,1 +1,1 @@
-export const PROMPT_VERSION = "qgen-2025-12-23.1";
+export const PROMPT_VERSION = "qgen-2026-10-12.8";

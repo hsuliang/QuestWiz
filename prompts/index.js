@@ -1,19 +1,20 @@
 import { QUESTION_STYLE } from '../constants.js';
 import { CONTENT_ROLE } from './blocks/content_role.js';
 import { getContentRules } from './blocks/content_rules.js';
-import { getQuestionRole } from './blocks/question_role.js';
+import { getQuestionRole } from './blocks/question_role.js?v=20261012-question-quality-5';
 import { getBloomDistributionText } from './blocks/question_bloom.js';
-import { COMPETENCY_RULES } from './blocks/question_style_competency.js';
+import { COMPETENCY_RULES } from './blocks/question_style_competency.js?v=20261012-question-quality-5';
 import { STANDARD_RULES } from './blocks/question_style_standard.js';
-import { QUESTION_SCHEMA } from './blocks/question_schema.js';
-import { getAdaptiveRules, getCompetencyContext } from './adaptive_matrix.js';
+import { SHARED_QUESTION_QUALITY_RULES, HIGH_QUALITY_REVIEW_RULES } from './blocks/question_quality.js?v=20261012-question-quality-5';
+import { buildQuestionTypePlan, getQuestionSchema } from './blocks/question_schema.js?v=20261012-question-quality-5';
+import { getAdaptiveRules, getCompetencyContext } from './adaptive_matrix.js?v=20261012-question-quality-5';
+import { getDomainGuidelines } from './domain_matrix.js?v=20261012-domain-review-1';
 
 // [v11.0] New Modular Blocks
-import { SCENARIO_BLOCKS } from './blocks/scenarios.js';
-import { STYLE_LEVEL_BLOCKS } from './blocks/style_levels.js';
-import { getStyleExamples } from './blocks/examples.js';
+import { SCENARIO_BLOCKS } from './blocks/scenarios.js?v=20261012-question-quality-5';
+import { STYLE_LEVEL_BLOCKS } from './blocks/style_levels.js?v=20261012-question-quality-5';
 
-export { PROMPT_VERSION } from './versions.js';
+export { PROMPT_VERSION } from './versions.js?v=20261012-question-quality-5';
 
 export function getContentSystemInstruction(params) {
     return [CONTENT_ROLE.trim(), getContentRules(params).trim()].join('\n\n');
@@ -23,9 +24,9 @@ export function getContentSystemInstruction(params) {
  * 核心系統提示詞產生器 (支援通用模式與專家模式)
  * @deprecated 請優先使用 getAdaptiveSystemInstruction
  */
-export function getQuestionSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords = [], expertParams = null, isHighQuality = false) {
+export function getQuestionSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords = [], expertParams = null, isHighQuality = false, domain = 'chinese', contextType = '', questionTypePlan = null) {
     // 為了向後相容，直接呼叫新邏輯
-    return getAdaptiveSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords, expertParams, isHighQuality);
+    return getAdaptiveSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords, expertParams, isHighQuality, domain, contextType, questionTypePlan);
 }
 
 /**
@@ -33,17 +34,23 @@ export function getQuestionSystemInstruction(count, type, difficulty, style, lan
  * 根據三維矩陣 (年級 x 層次 x 情境) 動態組裝 Prompt
  * 融合了 v9.8.1 的多樣性策略與關鍵字優先權，並實作風格光譜化 (Style Spectrum)
  */
-export function getAdaptiveSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords = [], expertParams = null, isHighQuality = false) {
+export function getAdaptiveSystemInstruction(count, type, difficulty, style, language, studentLevel, bloomDistribution, keywords = [], expertParams = null, isHighQuality = false, domain = 'chinese', contextType = '', questionTypePlan = null) {
     const adaptiveRules = getAdaptiveRules(studentLevel);
     
     // [Style Logic] Determine Style Level
-    // LEVEL_1: Knowledge Recall (Drill) - No Scenarios
-    // LEVEL_3: Competency Based (Context) - Complex Scenarios
+    // 風格決定題目呈現方式；Bloom 批次設定決定實際認知要求。
     const styleLevel = style === QUESTION_STYLE.COMPETENCY_BASED ? 'LEVEL_3' : 'LEVEL_1';
     
     const isCompetency = styleLevel === 'LEVEL_3';
     const contextRules = isCompetency ? getCompetencyContext(studentLevel) : null;
     const distributionText = getBloomDistributionText(bloomDistribution);
+    const effectiveTypePlan = Array.isArray(questionTypePlan) && questionTypePlan.length === count
+        ? questionTypePlan
+        : buildQuestionTypePlan(count, type);
+    const bloomLevels = Object.keys(bloomDistribution || {}).filter(level => bloomDistribution[level] > 0);
+    const targetBloomLevel = bloomLevels.length === 1 ? bloomLevels[0] : '';
+    const questionTypeLabel = type === 'true_false' ? '是非題' : type === 'mixed' ? '是非題與選擇題' : '選擇題';
+    const questionRole = getQuestionRole(count, questionTypeLabel, distributionText, difficulty, adaptiveRules.label, language, targetBloomLevel, effectiveTypePlan);
 
     // 1. 角色定義
     let prompt = `# Role: Adaptive Learning Assessment Specialist
@@ -55,56 +62,41 @@ Your goal is to generate ${count} high-quality, non-repetitive questions based o
 - **Language**: ${language === 'english' ? 'English' : 'Traditional Chinese (台灣繁體中文)'}
 - **Difficulty**: ${difficulty}
 `.trim();
+    const domainGuidelines = getDomainGuidelines(domain);
+    if (domainGuidelines) prompt += `\n\n${domainGuidelines}`;
 
-    // 2. [Priority 1] 核心命題任務 (Teacher's Constraints)
-    // 確保關鍵字具有最高優先權，解決脫鉤問題
+    // 2. 教師標記重點只決定內容範圍，不覆蓋題型與 Bloom 目標。
     if (keywords && keywords.length > 0) {
         prompt += `
 
 ### ⚠️ 核心命題任務 (MANDATORY)
-老師已明確標記以下「${keywords.length} 個重點」為本次測驗的最高優先考點。
-你「必須」優先針對這些重點設計題目，總題數精準維持在 ${count} 題。
+老師已明確標記以下「${keywords.length} 個重點」為本次測驗的內容範圍優先項。
+請優先從這些重點選材；此要求只決定測驗內容，不得改變本批題數、題型或指定的 Bloom 層次（${distributionText}）。
 **重點清單**：
 - ${keywords.join('\n- ')}`;
     }
 
-    // 3. 認知分佈與多樣性策略 (Diversity & Coverage)
+    // 3. 固定本批題數、題型與認知目標，避免風格規則覆蓋命題設定。
     // [Scenario Logic] Inject Dynamic Scenario Rules based on Style Level
-    const scenarioRule = styleLevel === 'LEVEL_3' ? SCENARIO_BLOCKS.COMPLEX : SCENARIO_BLOCKS.FORBIDDEN;
+    const scenarioRule = styleLevel === 'LEVEL_3' ? SCENARIO_BLOCKS.COMPETENCY : SCENARIO_BLOCKS.FORBIDDEN;
 
     prompt += `
 
-## 🧠 Cognitive Distribution (Bloom's Taxonomy)
-Strictly follow this distribution:
-${distributionText}
+## ⚖️ 命題設定優先序
+題數、題型與 Bloom 認知目標是硬性條件；命題風格、年級、難度及模式品質要求只能在這些條件內調整，不得改變題型或提升、降低認知要求。
+
+${questionRole}
 
 ## 🔄 Diversity & Coverage Guidelines (Strict)
-1. **No Concept Overlap**: Each of the ${count} questions MUST test a COMPLETELY DIFFERENT fact, concept, or paragraph.
-2. **Concept Variety**: If Q1 tests "Mechanism", Q2 should test "Impact" or "History", and Q3 should test "Comparison".
-3. **Full Content Coverage**: Spread the questions across the entire text. Do not ignore the middle or end of the text.
+1. 本批題目不得重複測量同一個事實或概念；若使用者訊息附有本卷先前題目，也不得與那些題目重複。
+2. 根據提供內容分散選材；內容不足時不可為了多樣性補造事實。
 ${scenarioRule}`;
 
-    // 4. 命題品質強化 (Standard/High Quality Mode)
-    let qualityInstruction = "";
-    if (!isHighQuality) {
-        qualityInstruction = `
-### 🎓 命題品質強化 (Standard Mode)
-為了提升測驗效果，請嚴格遵守：
-1. **對稱式選項**：所有選項的字數與結構應盡量接近。
-2. **誘答項設計**：禁止使用「以上皆是/非」、「絕對、完全、一定」等極端詞。
-3. **格式準確**：選項內容需簡潔，嚴禁包含 "A." "B." 等前綴。
-        `.trim();
-    } else {
-        qualityInstruction = `
-### 🧠 精準邏輯命題 (High Quality Mode - CoT)
-請發揮深度推理能力，並在輸出前進行內部驗證：
-1. **邏輯校驗 (Chain of Thought)**：在生成每一題前，請先在內部確認「題目是否具備單一確定的正解？」以及「誘答項是否具備足夠的干擾力？」。
-2. **推論性題目**：著重設計需要跨段落整合資訊的題目。
-        `.trim();
-    }
+    // 4. 所有模式都必須達到同一題幹與選項標準；高品質模式只增加更嚴格的複核。
     prompt += `
 
-${qualityInstruction}`;
+${SHARED_QUESTION_QUALITY_RULES}
+${isHighQuality ? HIGH_QUALITY_REVIEW_RULES : ''}`;
 
     // 5. 語言學風格指南 (Linguistic Style Guide) - 作為「風格濾鏡」
     prompt += `
@@ -162,25 +154,11 @@ ${STANDARD_RULES}`;
 ${adaptiveRules.distractor_logic}`;
     }
 
-    // [New] 9. Few-Shot Examples (Golden Standards)
-    prompt += getStyleExamples(styleLevel);
-
-    // 10. 輸出格式 (Schema)
+    // 9. 輸出格式 (Schema)
     prompt += `
 
 ## 📦 Output Format
-${QUESTION_SCHEMA}`;
-
-    // 11. Gemini 3 Thinking Mode Injection (High Quality)
-    if (isHighQuality) {
-        prompt += `
-
-## 🧠 Chain of Thought (Internal Verification)
-Before generating the JSON, verify that:
-1. The vocabulary matches the target level (${adaptiveRules.label}).
-2. No negative constraints were violated.
-3. Each question covers a distinct concept.`;
-    }
+${getQuestionSchema(effectiveTypePlan, targetBloomLevel)}`;
 
     return prompt;
 }

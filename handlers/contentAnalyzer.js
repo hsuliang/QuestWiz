@@ -1,4 +1,4 @@
-import * as api from '../api.js';
+import * as api from '../api.js?v=20261012-domain-review-1';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
@@ -186,7 +186,7 @@ async function requestKeywordAnalysis(text, images, apiKey, signal) {
         taskParts.push({ inline_data: { mime_type: img.type, data: img.data } });
     });
 
-    const modelName = CONFIG.MODELS.STANDARD;
+    const modelName = CONFIG.MODELS[api.getGeminiMode()];
 
     const payload = {
         "contents": [{ "role": "user", "parts": taskParts }],

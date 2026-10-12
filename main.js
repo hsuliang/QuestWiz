@@ -1,13 +1,14 @@
 import { elements } from './dom.js';
-import * as ui from './ui.js?v=20261011R3-ui5';
+import * as ui from './ui.js?v=20261012-question-quality-5';
 import * as utils from './utils.js';
 import * as state from './state.js';
-import * as api from './api.js';
+import * as api from './api.js?v=20261012-domain-review-1';
 import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
-import * as GenHandlers from './handlers/generator.js?v=20261011R3-ui5';
+import * as GenHandlers from './handlers/generator.js?v=20261012-domain-review-2';
+import * as ReviewHandlers from './handlers/review.js?v=20261012-domain-review-3';
 import * as LibHandlers from './handlers/library.js';
 import * as ContentHandlers from './handlers/content.js';
 import * as AnalyzerHandlers from './handlers/contentAnalyzer.js';
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.subscribe((key, value) => {
             try {
                 if (key === 'generatedQuestions') {
+                    ReviewHandlers.clearReview();
                     if (state.isBusy('generate') || !document.activeElement?.closest('#questions-container')) {
                         ui.renderQuestionsForEditing(value || [], editorCallbacks);
                         ui.initializeSortable();
@@ -92,6 +94,15 @@ document.addEventListener('DOMContentLoaded', () => {
     safeExecute('Apply Theme', () => ui.applyThemePreference());
     safeExecute('Init Language', () => ui.initLanguage());
     safeExecute('Visitor Count', () => ui.updateVisitorCount());
+    safeExecute('Restore Gemini model mode', () => {
+        const mode = api.getGeminiMode();
+        document.querySelectorAll('input[name="gemini-model-mode"]').forEach(input => {
+            input.checked = input.value === mode;
+            input.closest('.api-model-mode-option')?.classList.toggle('is-selected', input.checked);
+        });
+        document.getElementById('gemini-high-quality-warning')?.classList.toggle('hidden', mode !== 'HIGH_QUALITY');
+        ui.updateGeminiModeBadge(mode);
+    });
     
     safeExecute('Restore Mode', () => {
         const savedMode = localStorage.getItem('appMode_v1') || 'quick';
@@ -124,6 +135,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const themeTrigger = document.getElementById('header-theme-btn');
         const themeMenu = document.getElementById('header-theme-menu');
         let modalReturnFocus = null;
+        const syncGeminiModeControls = (mode = api.getGeminiMode()) => {
+            document.querySelectorAll('input[name="gemini-model-mode"]').forEach(input => {
+                input.checked = input.value === mode;
+                input.closest('.api-model-mode-option')?.classList.toggle('is-selected', input.checked);
+            });
+            document.getElementById('gemini-high-quality-warning')?.classList.toggle('hidden', mode !== 'HIGH_QUALITY');
+        };
+        const applyGeminiModeSelection = () => {
+            const selectedMode = document.querySelector('input[name="gemini-model-mode"]:checked')?.value;
+            const mode = api.setGeminiMode(selectedMode);
+            ui.updateGeminiModeBadge(mode);
+            syncGeminiModeControls(mode);
+        };
         const closeThemeMenu = () => {
             themeMenu?.classList.add('hidden');
             themeTrigger?.setAttribute('aria-expanded', 'false');
@@ -136,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         bind(apiTrigger, 'click', () => {
             closeThemeMenu();
+            syncGeminiModeControls();
             modalReturnFocus = document.activeElement;
             apiModal?.classList.remove('hidden');
             apiModal?.setAttribute('aria-hidden', 'false');
@@ -145,6 +170,10 @@ document.addEventListener('DOMContentLoaded', () => {
         bind(document.getElementById('close-api-settings-x'), 'click', closeApiSettings, 'closeApiSettingsX');
         bind(document.getElementById('close-api-settings-btn'), 'click', closeApiSettings, 'closeApiSettingsBtn');
         bind(apiModal, 'click', e => { if (e.target === apiModal) closeApiSettings(); }, 'apiSettingsBackdrop');
+        document.querySelectorAll('input[name="gemini-model-mode"]').forEach(input => bind(input, 'change', () => {
+            const mode = document.querySelector('input[name="gemini-model-mode"]:checked')?.value || 'STANDARD';
+            syncGeminiModeControls(mode);
+        }, 'geminiModeSelection'));
         bind(themeTrigger, 'click', () => {
             const willOpen = themeMenu?.classList.contains('hidden');
             themeMenu?.classList.toggle('hidden', !willOpen);
@@ -215,9 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'admin-login-btn');
 
         // 出題
-        bind(elements.regenerateBtn, 'click', () => { ui.showLoader('AI正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'regenerateBtn');
-        bind(elements.expertGenerateBtn, 'click', () => { ui.showLoader('專家模式正在出題...'); GenHandlers.triggerQuestionGeneration(); }, 'expertGenerateBtn');
+        bind(elements.regenerateBtn, 'click', GenHandlers.triggerQuestionGeneration, 'regenerateBtn');
+        bind(elements.expertGenerateBtn, 'click', GenHandlers.triggerQuestionGeneration, 'expertGenerateBtn');
         bind(document.getElementById('result-regenerate-btn'), 'click', () => elements.regenerateBtn?.click(), 'resultRegenerateBtn');
+        bind(document.getElementById('review-quiz-btn'), 'click', ReviewHandlers.reviewCurrentQuiz, 'reviewQuizBtn');
         bind(elements.quizTitleInput, 'input', (event) => {
             const summary = state.getQuizSummary();
             ui.renderQuizResultHeader(state.getGeneratedQuestions(), summary ? { ...summary, title: event.target.value.trim() } : summary);
@@ -289,99 +319,37 @@ document.addEventListener('DOMContentLoaded', () => {
             SessionHandlers.clearAllInputs();
         }, 'clearAndNewBtn');
 
-        bind(elements.saveApiKeyBtn, 'click', async () => {
+        bind(elements.saveApiKeyBtn, 'click', () => {
             const rawValue = elements.apiKeyInput?.value || '';
             // 解析多組金鑰：支援換行、逗號、分號分隔
-            const keys = rawValue.split(/[\n,;]+/).map(k => k.trim()).filter(k => k.length > 5);
+            const keys = [...new Set(rawValue.split(/[\n,;]+/).map(k => k.trim()).filter(k => k.length > 5))];
             
             if (keys.length === 0) {
                 ui.showToast('請輸入有效的 API Key', 'error');
                 return;
             }
 
-            ui.showLoader('正在驗證金鑰可用性...');
+            const expires = Date.now() + (2 * 60 * 60 * 1000);
+            const storageData = {
+                value: keys,
+                expires,
+                isMulti: keys.length > 1,
+                keyStatuses: keys.map(() => 'unverified')
+            };
             try {
-                // 並行呼叫探針以驗證金鑰是否正常
-                const validationPromises = keys.map(async (key) => {
-                    await api.validateApiKey(key);
-                    return key;
-                });
-
-                const results = await Promise.allSettled(validationPromises);
-                
-                const validKeys = [];
-                const networkFailedKeys = [];
-                const invalidKeys = [];
-
-                results.forEach((r, idx) => {
-                    const key = keys[idx];
-                    if (r.status === 'fulfilled') {
-                        validKeys.push(r.value);
-                    } else {
-                        const errMsg = r.reason?.message || '';
-                        if (errMsg.includes('NETWORK_ERROR:')) {
-                            networkFailedKeys.push(key);
-                        } else {
-                            invalidKeys.push(key);
-                        }
-                    }
-                });
-
-                // 狀況一：有部分金鑰成功通過驗證
-                if (validKeys.length > 0) {
-                    const expires = Date.now() + (2 * 60 * 60 * 1000);
-                    const storageData = { value: validKeys, expires, isMulti: validKeys.length > 1 };
-                    sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
-                    api.resetGeminiRouting();
-
-                    if (elements.apiKeyInput) {
-                        elements.apiKeyInput.value = validKeys.join('\n');
-                    }
-
-                    const excludedCount = keys.length - validKeys.length;
-                    if (excludedCount > 0) {
-                        ui.showToast(`已成功儲存 ${validKeys.length} 組有效金鑰，自動排除 ${excludedCount} 組失效金鑰！`, 'warning');
-                    } else {
-                        const msg = validKeys.length > 1 ? `已儲存 ${validKeys.length} 組金鑰！` : 'API Key 已儲存！';
-                        ui.showToast(msg, 'success');
-                    }
-                    ui.startKeyTimer(expires);
-                    closeApiSettings();
-                    return;
-                }
-
-                // 狀況二：全數失敗，但全部/部分是因為網路或 CORS 問題無法驗證，且沒有明確判定失效的金鑰
-                if (networkFailedKeys.length > 0 && invalidKeys.length === 0) {
-                    ui.hideLoader(); // 先關閉載入框，避免 confirm 阻擋時畫面全黑
-                    const confirmSave = confirm(
-                        `【網路連線或 CORS 限制】\n系統無法與 Google 伺服器連線驗證您的金鑰狀態（共 ${networkFailedKeys.length} 組）。\n這通常是暫時的網路問題或瀏覽器安全性限制。\n\n您是否要直接儲存這些金鑰？`
-                    );
-                    if (confirmSave) {
-                        ui.showLoader('正在儲存金鑰...');
-                        const expires = Date.now() + (2 * 60 * 60 * 1000);
-                        const storageData = { value: networkFailedKeys, expires, isMulti: networkFailedKeys.length > 1 };
-                        sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
-                    api.resetGeminiRouting();
-
-                        if (elements.apiKeyInput) {
-                            elements.apiKeyInput.value = networkFailedKeys.join('\n');
-                        }
-
-                        ui.showToast(`已儲存 ${networkFailedKeys.length} 組金鑰（未通過線上驗證）`, 'warning');
-                        ui.startKeyTimer(expires);
-                        closeApiSettings();
-                    }
-                    return;
-                }
-
-                // 狀況三：全數驗證失敗，且包含明確被判定無效的金鑰
-                ui.showToast('輸入的金鑰均無效或已耗盡額度！儲存已被攔截。', 'error');
+                sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
             } catch (err) {
-                console.error("[System] Validation failed:", err);
-                ui.showToast('驗證金鑰時發生未知錯誤，請稍後再試。', 'error');
-            } finally {
-                ui.hideLoader();
+                console.error('[System] Could not save API keys:', err);
+                ui.showToast('瀏覽器無法儲存金鑰，請檢查瀏覽器儲存空間設定。', 'error');
+                return;
             }
+
+            api.resetGeminiRouting();
+            applyGeminiModeSelection();
+            if (elements.apiKeyInput) elements.apiKeyInput.value = keys.join('\n');
+            ui.startKeyTimer(expires);
+            ui.showToast(`已儲存 ${keys.length} 組金鑰；首次使用 AI 時會自動驗證。`, 'success');
+            closeApiSettings();
         }, 'saveApiKeyBtn');
         bind(elements.clearApiKeyBtn, 'click', () => {
             sessionStorage.removeItem('gemini_api_key_data');

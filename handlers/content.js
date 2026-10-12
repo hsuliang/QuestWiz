@@ -1,10 +1,10 @@
 import { QUESTION_STYLE } from '../constants.js';
 import { CONFIG, contentLoadingMessages } from '../config.js';
 import * as ui from '../ui.js';
-import { getApiKey, fetchWithRetry, makeCentralizedRequest } from '../api.js';
+import { getGeminiMode, makeCentralizedRequest } from '../api.js?v=20261012-domain-review-1';
 import { elements } from '../dom.js';
-import { getContentSystemInstruction } from '../prompts/index.js';
-import { getAdaptiveRules } from '../prompts/adaptive_matrix.js'; // [v11.0]
+import { getContentSystemInstruction } from '../prompts/index.js?v=20261012-domain-review-1';
+import { getAdaptiveRules } from '../prompts/adaptive_matrix.js?v=20261012-question-quality-5'; // [v11.0]
 import { isEnglish } from '../utils.js';
 import { handleError } from '../utils/errorHandler.js';
 import { saveInputDraft, triggerOrUpdate } from './session.js';
@@ -102,12 +102,13 @@ export async function callGeminiForContent(promptString) {
     }, 2500); 
     
     try {
-        const isHighQuality = false;
-        const modelName = CONFIG.MODELS.STANDARD;
+        const mode = getGeminiMode();
+        const isHighQuality = mode === 'HIGH_QUALITY';
+        const modelName = CONFIG.MODELS[mode];
 
         console.log('[Content] Model Selection:', { isHighQuality, modelName });
 
-        const genConfig = { "temperature": 0.7, "maxOutputTokens": 8192, "responseMimeType": "application/json" };
+        const genConfig = { "temperature": isHighQuality ? 0.4 : 0.7, "maxOutputTokens": 8192, "responseMimeType": "application/json" };
 
         const payload = {
             "contents": [{"parts": [{ "text": "請根據 systemInstruction 中的詳細指令生成內容。" }] }],
@@ -428,7 +429,7 @@ ${rawContent.substring(0, 30000)}
 `;
 
             try {
-                const modelName = CONFIG.MODELS.STANDARD;
+                const modelName = CONFIG.MODELS[getGeminiMode()];
 
                 // [Refactor] 使用中央化請求進行清洗
                 const payload = {

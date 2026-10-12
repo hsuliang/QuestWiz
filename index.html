@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" href="Logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css?v=workbench-redesign-10">
+    <link rel="stylesheet" href="style.css?v=20261012-domain-review-1">
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -48,6 +48,10 @@
                     </div>
                 </div>
                 <div class="app-header-actions">
+                    <div id="gemini-mode-badge" class="gemini-mode-badge" aria-live="polite">
+                        <span class="gemini-mode-indicator" aria-hidden="true"></span>
+                        <span id="gemini-mode-badge-text" data-i18n="model_mode_badge_standard">標準模式</span>
+                    </div>
                     <div id="model-badge-container" class="app-engine-badge hidden"></div>
                     <button id="header-library-btn" type="button" class="app-library-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -565,10 +569,13 @@
                                 <p id="quiz-result-overview" class="quiz-result-overview"></p>
                             </div>
                             <div class="quiz-result-actions">
+                                <button id="review-quiz-btn" type="button" class="quiz-result-action-btn" title="另行使用 Gemini 審題，會消耗一次 API 配額">⌕ 審題</button>
                                 <button id="add-custom-question-btn" type="button" class="quiz-result-action-btn" data-i18n="result_add_question">⊕ 新增自訂題目</button>
                                 <button id="result-regenerate-btn" type="button" class="quiz-result-action-btn quiz-result-action-primary" data-i18n="result_regenerate">⟳ 重新出題</button>
                             </div>
                         </section>
+
+                        <section id="quiz-review-report" class="quiz-review-report hidden" aria-live="polite"></section>
 
                         <div id="format-toolbar" class="format-toolbar hidden">
                             <div class="format-toolbar-row">
@@ -629,7 +636,7 @@
 
             <footer class="text-center mt-10 py-8 text-sm text-gray-500 border-t border-gray-200">
                 <p>
-                    <span id="version-btn" class="cursor-pointer hover:underline font-bold themed-accent-text">丙午．寒露．20261010R1</span> | 
+                    <span id="version-btn" class="cursor-pointer hover:underline font-bold themed-accent-text">丙午．寒露．20261010R6</span> |
                     <a href="https://bit.ly/Aliang" target="_blank" class="themed-accent-text">ㄚ亮笑長練功坊</a> | 
                     <a href="readme.html" target="_blank" class="themed-accent-text themed-accent-text-hover" data-i18n="footer_intro">程式簡介與使用說明</a> |
                     瀏覽人數: <span id="visitor-counter" data-status="loading">載入中</span>
@@ -662,6 +669,34 @@
                         </div>
                         <div class="api-routing-state"><span id="api-modal-status-text">尚未設定金鑰</span><span id="api-key-timer" style="display: none;"></span></div>
                     </div>
+
+                    <section class="api-model-mode-section" aria-labelledby="api-model-mode-title">
+                        <div class="api-model-mode-heading">
+                            <div>
+                                <h3 id="api-model-mode-title" data-i18n="model_mode_label">Gemini 模型模式</h3>
+                                <p id="gemini-mode-hint" data-i18n="model_mode_switch_hint">選擇後按「儲存並套用金鑰」生效。</p>
+                            </div>
+                        </div>
+                        <fieldset id="gemini-mode-options" class="api-model-mode-options" aria-describedby="gemini-mode-hint gemini-high-quality-warning gemini-mode-safety-note">
+                            <legend class="sr-only" data-i18n="model_mode_label">Gemini 模型模式</legend>
+                            <label class="api-model-mode-option">
+                                <input type="radio" name="gemini-model-mode" value="STANDARD" checked>
+                                <span class="api-model-mode-option-copy">
+                                    <strong data-i18n="model_mode_standard_title">標準模式（預設）</strong>
+                                    <small data-i18n="model_mode_standard_desc">3.5 Flash-Lite → 3.1 Flash-Lite → 2.5 Flash-Lite</small>
+                                </span>
+                            </label>
+                            <label class="api-model-mode-option">
+                                <input type="radio" name="gemini-model-mode" value="HIGH_QUALITY">
+                                <span class="api-model-mode-option-copy">
+                                    <strong data-i18n="model_mode_high_quality_title">高品質模式</strong>
+                                    <small data-i18n="model_mode_high_quality_desc">3.8 Flash → 3.6 Flash → 2.5 Flash</small>
+                                </span>
+                            </label>
+                        </fieldset>
+                        <p id="gemini-high-quality-warning" class="api-model-mode-warning hidden" role="status" data-i18n="model_mode_warning">高品質模式的免費額度較有限；只會在高品質模型間備援，不會自動降級。無法使用時，請手動切換標準模式。</p>
+                        <p id="gemini-mode-safety-note" class="api-model-mode-note"><span data-i18n="model_mode_safety_note">本機會依模式限制請求速率與用量；不同裝置不共用紀錄，實際配額以 Google AI Studio 為準。</span> <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer" data-i18n="model_mode_quota_link">查看 Google 配額說明 ↗</a></p>
+                    </section>
 
                     <div class="api-key-label-row">
                         <label for="api-key-input" data-i18n="api_paste_label">貼上 Gemini API 金鑰</label>
@@ -876,6 +911,6 @@
         </div>
     </template>
 
-    <script src="main.js?v=20261011R3-ui5" type="module"></script>
+    <script src="main.js?v=20261012-domain-review-3" type="module"></script>
 </body>
 </html>

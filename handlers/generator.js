@@ -1,11 +1,16 @@
-import { generateSingleBatch } from '../api.js';
+import { generateSingleBatch, getGeminiMode } from '../api.js?v=20261012-domain-review-1';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
 import { isEnglish } from '../utils.js';
 import { handleError } from '../utils/errorHandler.js'; // [Fix] Separate import
-import { normalizeQuestions } from '../utils/normalizer.js';
+import { normalizeQuestions } from '../utils/normalizer.js?v=20261012-question-quality-5';
 import { QUESTION_STYLE, DIFFICULTY, BLOOM_LEVELS } from '../constants.js';
+import { CONFIG } from '../config.js';
+import { buildQuestionTypePlan } from '../prompts/blocks/question_schema.js?v=20261012-question-quality-5';
+
+let lastGenerationSource = null;
+export function getLastGenerationSource() { return lastGenerationSource; }
 
 /**
  * 計算布魯姆分配比例
@@ -74,6 +79,10 @@ export async function triggerQuestionGeneration() {
         console.warn('[Generator] Already busy, ignoring request');
         return;
     }
+    if (state.isBusy('review')) {
+        ui.showToast('審題進行中，請稍後再出題。', 'warning');
+        return;
+    }
 
     const text = elements.textInput ? elements.textInput.value : '';
     const uploadedImages = state.getUploadedImages();
@@ -91,6 +100,10 @@ export async function triggerQuestionGeneration() {
     // [New] 偵測模式
     const expertSettings = document.getElementById('expert-mode-settings');
     const isExpertMode = expertSettings && !expertSettings.classList.contains('hidden');
+    if (!isExpertMode && !elements.domainSelectQuiz?.value) {
+        ui.showToast('請先選擇學習領域', 'error');
+        return;
+    }
     const totalQuestions = parseInt(elements.numQuestionsInput.value, 10) || 5;
     const selectedKeywords = state.getSelectedKeywords();
 
@@ -168,7 +181,8 @@ async function proceedWithGeneration(settings) {
     console.log('[Generator] proceedWithGeneration started');
     const { requestId, signal } = state.startTask('generate');
     
-    const isHighQuality = false;
+    const isHighQuality = getGeminiMode() === 'HIGH_QUALITY';
+    lastGenerationSource = null;
     ui.showLoader("AI 正在光速生成題目...");
 
     // 清空舊資料，觸發響應式 UI 清空預覽
@@ -178,6 +192,8 @@ async function proceedWithGeneration(settings) {
     try {
         const bloomDistribution = calculateBloomDistribution(settings.totalQuestions, settings.questionStyle, settings.difficulty, settings.userSelectedLevels);
         const levelsToProcess = Object.keys(bloomDistribution).filter(l => bloomDistribution[l] > 0);
+        const questionTypePlan = buildQuestionTypePlan(settings.totalQuestions, settings.questionType);
+        let questionTypePlanOffset = 0;
         let allGeneratedQs = [];
         let actualModelName = '';
 
@@ -187,6 +203,7 @@ async function proceedWithGeneration(settings) {
                 if (signal.aborted || !state.isTaskValid('generate', requestId)) return;
                 
                 const batchSize = Math.min(count, 5);
+                const batchQuestionTypePlan = questionTypePlan.slice(questionTypePlanOffset, questionTypePlanOffset + batchSize);
                 console.log(`[Generator] Requesting batch of ${batchSize} for level ${level} (HighQuality: ${isHighQuality})`);
                 
                 const result = await generateSingleBatch(
@@ -194,35 +211,48 @@ async function proceedWithGeneration(settings) {
                     settings.text, settings.uploadedImages, settings.questionStyle, 
                     signal, settings.languageChoice, settings.studentLevel, 
                     level, settings.selectedKeywords, settings, isHighQuality,
-                    settings.domain, settings.contextType
+                    settings.domain, settings.contextType, batchQuestionTypePlan,
+                    allGeneratedQs.map(question => {
+                        const answerPosition = question.options?.length === 4 && question.correct?.length === 1 && question.correct[0] >= 0 && question.correct[0] < 4
+                            ? `；正解位置：${String.fromCharCode(65 + question.correct[0])}`
+                            : '';
+                        const concept = question.design_concept ? `；考查重點：${question.design_concept}` : '';
+                        return `${question.text}${concept}${answerPosition}`;
+                    })
                 );
-                
-                if (result && result.questions) {
-                    if (result.meta && result.meta.modelName) {
-                        actualModelName = result.meta.modelName;
-                    }
-                    const sanitizedBatch = normalizeQuestions(result.questions, level);
-                    allGeneratedQs = allGeneratedQs.concat(sanitizedBatch);
-                    
-                    // 關鍵：更新 State，這會觸發 main.js 渲染 UI
-                    console.log(`[Generator] New questions received. Total: ${allGeneratedQs.length}`);
-                    state.setGeneratedQuestions([...allGeneratedQs]);
-                    
-                    if (result.suggestedTitle && elements.quizTitleInput) {
-                        elements.quizTitleInput.value = result.suggestedTitle.trim();
-                    }
+                if (!result || !Array.isArray(result.questions) || result.questions.length !== batchSize) {
+                    throw new Error('AI 回傳題數不足，請重新出題。');
+                }
+                questionTypePlanOffset += batchSize;
+
+                if (result.meta?.modelName) actualModelName = result.meta.modelName;
+                const sanitizedBatch = normalizeQuestions(result.questions, level, batchQuestionTypePlan);
+                allGeneratedQs = allGeneratedQs.concat(sanitizedBatch);
+
+                // 關鍵：更新 State，這會觸發 main.js 渲染 UI
+                console.log(`[Generator] New questions received. Total: ${allGeneratedQs.length}`);
+                state.setGeneratedQuestions([...allGeneratedQs]);
+
+                if (result.suggestedTitle && elements.quizTitleInput) {
+                    elements.quizTitleInput.value = result.suggestedTitle.trim();
                 }
                 count -= batchSize;
             }
         }
 
         // 最後產出摘要
+        const actualBloomDistribution = allGeneratedQs.reduce((distribution, question) => {
+            if (question.bloomLevel) {
+                distribution[question.bloomLevel] = (distribution[question.bloomLevel] || 0) + 1;
+            }
+            return distribution;
+        }, {});
         state.setQuizSummary({
             questionStyle: settings.questionStyle,
             questionType: settings.questionType,
             difficulty: settings.difficulty,
             totalQuestions: allGeneratedQs.length,
-            distribution: bloomDistribution,
+            distribution: actualBloomDistribution,
             isAutoGenerated: !settings.userSelectedLevels?.length,
             domain: settings.domain,
             domainLabel: elements.domainSelectQuiz?.selectedOptions?.[0]?.textContent?.trim() || '',
@@ -230,12 +260,15 @@ async function proceedWithGeneration(settings) {
             studentLevelLabel: elements.studentLevelSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
             contextLabel: elements.contextTypeSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
             title: elements.quizTitleInput?.value?.trim() || '',
-            modelName: actualModelName || 'gemini-2.5-flash-lite'
+            modelName: actualModelName || CONFIG.MODELS[isHighQuality ? 'HIGH_QUALITY' : 'STANDARD']
         });
+        lastGenerationSource = { text: settings.text, images: settings.uploadedImages };
         ui.switchWorkTab('edit'); // 自動切回編輯分頁
 
     } catch (error) {
         console.error('[Generator] Error during generation:', error);
+        state.setGeneratedQuestions([]);
+        state.setQuizSummary(null);
         handleError(error, 'proceedWithGeneration');
     } finally {
         console.log('[Generator] Task complete, ending session');
