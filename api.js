@@ -1,10 +1,8 @@
 import { CONFIG } from './config.js';
-import { showToast, stopKeyTimer, t, showLoader, updateApiKeyBadge } from './ui.js?v=20261012-question-quality-5';
-import { elements } from './dom.js'; 
-import { getAdaptiveSystemInstruction, getQuestionUserPrompt, PROMPT_VERSION } from './prompts/index.js?v=20261012-domain-review-1';
+import { stopKeyTimer, t, showLoader, updateApiKeyBadge } from './ui.js?v=20261013R1';
+import { getAdaptiveSystemInstruction, PROMPT_VERSION } from './prompts/index.js?v=20261012-domain-review-1';
 import { buildQuestionTypePlan } from './prompts/blocks/question_schema.js?v=20261012-question-quality-5';
 import { validateQuestionBatch } from './utils/normalizer.js?v=20261012-question-quality-5';
-import { parseGeminiError } from './utils.js'; 
 
 const MODEL_FRIENDLY_NAMES = {
     'gemini-3.8-flash': 'Gemini 3.8 Flash',
@@ -38,13 +36,11 @@ const MODEL_ALLOWLISTS = {
         'gemini-2.5-flash-lite'
     ]
 };
-const FLASH_ALLOWLIST = [...new Set(Object.values(MODEL_ALLOWLISTS).flat())];
 const MODEL_CACHE_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * MODEL_CACHE_MS;
 const MINUTE_MS = 60 * 1000;
 const GEMINI_REQUEST_TIMEOUT_MS = 90 * 1000;
-const modelCache = new Map();
-const routing = new Map();
+const unavailableModels = new Set();
 let inMemoryGeminiMode = 'STANDARD';
 const inMemoryQuotaLedger = {};
 
@@ -63,77 +59,10 @@ export function setGeminiMode(mode) {
     return inMemoryGeminiMode;
 }
 
-function getRoute(key) {
-    if (!routing.has(key)) routing.set(key, { count: 0, lastAt: 0, cooldownUntil: 0, models: {} });
-    return routing.get(key);
-}
+export function resetGeminiRequestState() { unavailableModels.clear(); }
 
-export function resetGeminiRouting() {
-    routing.clear();
-    modelCache.clear();
-}
-
-function useAllowlistModelFallback(apiKey) {
-    const models = [...FLASH_ALLOWLIST];
-    modelCache.set(apiKey, { models, expires: Date.now() + MODEL_CACHE_MS });
-    return models;
-}
-
-function modelId(name) {
-    return (name || '').replace(/^models\//, '');
-}
-
-function matchesModel(name, base) {
-    return name === base || (name.startsWith(base) && /^-\d{3,}$/.test(name.slice(base.length)));
-}
-
-function isAllowedModel(name, allowlist = FLASH_ALLOWLIST) {
-    return allowlist.some(base => matchesModel(name, base));
-}
-
-function modelPriority(name, highQuality) {
-    const order = highQuality ? MODEL_ALLOWLISTS.HIGH_QUALITY : MODEL_ALLOWLISTS.STANDARD;
-    return order.findIndex(base => matchesModel(name, base));
-}
-
-export async function resolveFlashModelsList(apiKey, throwOnError = false) {
-    if (!apiKey) return [];
-    const cached = modelCache.get(apiKey);
-    if (cached && cached.expires > Date.now()) return cached.models;
-    try {
-        const models = [];
-        let pageToken = '';
-        do {
-            const url = new URL(`${CONFIG.BASE_URL}/models`);
-            url.searchParams.set('pageSize', '1000');
-            if (pageToken) url.searchParams.set('pageToken', pageToken);
-            const response = await fetch(url, { headers: { 'x-goog-api-key': apiKey } });
-            if (!response.ok) {
-                const error = new Error(`Models API HTTP ${response.status}`);
-                error.status = response.status;
-                throw error;
-            }
-            const data = await response.json();
-            if (!Array.isArray(data.models)) throw new Error('Models API 格式錯誤');
-            models.push(...data.models);
-            pageToken = data.nextPageToken || '';
-        } while (pageToken);
-        const available = [...new Set(models.filter(item => item.supportedGenerationMethods?.includes('generateContent'))
-            .map(item => modelId(item.name)).filter(isAllowedModel))];
-        if (!available.length) return useAllowlistModelFallback(apiKey);
-        modelCache.set(apiKey, { models: available, expires: Date.now() + MODEL_CACHE_MS });
-        return available;
-    } catch (error) {
-        if (throwOnError) throw error;
-        // 模型清單查詢只作為最佳化；失敗時仍以實際 generateContent 請求判斷金鑰與模型是否可用。
-        return useAllowlistModelFallback(apiKey);
-    }
-}
-
-export async function resolveLatestFlashModel(apiKey, throwOnError = false) {
-    const models = await resolveFlashModelsList(apiKey, throwOnError);
-    return models.filter(name => isAllowedModel(name, MODEL_ALLOWLISTS.HIGH_QUALITY))
-        .sort((a, b) => modelPriority(a, true) - modelPriority(b, true) || b.localeCompare(a, undefined, { numeric: true }))[0] || null;
+export function createGeminiRequestBudget(batchCount = 1) {
+    return { base: batchCount, correction: batchCount, fallback: 3 };
 }
 
 export async function fetchWithRetry(url, options, retries = 2, initialDelay = 1000) {
@@ -151,44 +80,103 @@ export async function fetchWithRetry(url, options, retries = 2, initialDelay = 1
     }
 }
 
-function keyData() {
-    try {
-        const data = JSON.parse(sessionStorage.getItem('gemini_api_key_data') || 'null');
-        if (!data || Date.now() >= data.expires) {
-            sessionStorage.removeItem('gemini_api_key_data');
-            stopKeyTimer();
-            resetGeminiRouting();
-            return null;
+const API_KEY_DATA_KEY = 'gemini_api_key_data';
+const API_KEY_LIFETIME_KEY = 'gemini_api_key_lifetime_v1';
+const KEY_LIFETIMES = { '2h': 2, '4h': 4, '8h': 8, '24h': 24 };
+
+function keyRecord() {
+    const stores = [];
+    try { stores.push(['local', globalThis.localStorage]); } catch { /* Local storage may be disabled by browser policy. */ }
+    try { stores.push(['session', globalThis.sessionStorage]); } catch { /* Session storage may be disabled by browser policy. */ }
+    for (const [storageType, storage] of stores) {
+        try {
+            const raw = storage.getItem(API_KEY_DATA_KEY);
+            if (!raw) continue;
+            const data = JSON.parse(raw);
+            const expires = data?.expires;
+            const invalidExpiry = expires !== null && !Number.isFinite(expires);
+            if (!data || typeof data.value !== 'string' || !data.value || invalidExpiry
+                || (Number.isFinite(expires) && Date.now() >= expires)) {
+                storage.removeItem(API_KEY_DATA_KEY);
+                stopKeyTimer();
+                resetGeminiRequestState();
+                continue;
+            }
+            return { data, storage, storageType };
+        } catch {
+            try { storage.removeItem(API_KEY_DATA_KEY); } catch { /* Ignore unavailable browser storage. */ }
         }
-        return data;
-    } catch {
-        return null;
     }
+    return null;
+}
+
+function keyData() {
+    return keyRecord()?.data || null;
+}
+
+export function getApiKeyInfo() {
+    const record = keyRecord();
+    if (!record) return null;
+    return {
+        ...record.data,
+        storageMode: record.data.storageMode || (record.storageType === 'session' ? '2h' : 'permanent')
+    };
+}
+
+export function saveApiKey(apiKey, lifetime = '2h') {
+    if (!Object.hasOwn(KEY_LIFETIMES, lifetime) && !['session', 'permanent'].includes(lifetime)) {
+        throw new Error('金鑰保存期限設定無效。');
+    }
+    const storageMode = lifetime;
+    const storage = lifetime === 'session' ? globalThis.sessionStorage : globalThis.localStorage;
+    const expires = Object.hasOwn(KEY_LIFETIMES, lifetime)
+        ? Date.now() + KEY_LIFETIMES[lifetime] * 60 * 60 * 1000
+        : null;
+    const data = { value: apiKey, expires, storageMode, status: 'unverified', updatedAt: Date.now() };
+    storage.setItem(API_KEY_DATA_KEY, JSON.stringify(data));
+    try {
+        const otherStorage = lifetime === 'session' ? globalThis.localStorage : globalThis.sessionStorage;
+        otherStorage.removeItem(API_KEY_DATA_KEY);
+    } catch { /* The latest saved record takes precedence. */ }
+    try { globalThis.localStorage.setItem(API_KEY_LIFETIME_KEY, lifetime); }
+    catch { /* Saving the key does not depend on remembering the preferred lifetime. */ }
+    resetGeminiRequestState();
+    updateApiKeyBadge();
+    return data;
+}
+
+export function getPreferredApiKeyLifetime() {
+    try {
+        const saved = globalThis.localStorage.getItem(API_KEY_LIFETIME_KEY);
+        if (Object.hasOwn(KEY_LIFETIMES, saved) || ['session', 'permanent'].includes(saved)) return saved;
+    } catch { /* Fall back to the recommended duration. */ }
+    return '2h';
+}
+
+export function clearSavedApiKey() {
+    const stores = [];
+    try { stores.push(globalThis.localStorage); } catch { /* Continue with session storage. */ }
+    try { stores.push(globalThis.sessionStorage); } catch { /* Continue with any available store. */ }
+    for (const storage of stores) {
+        try { storage.removeItem(API_KEY_DATA_KEY); } catch { /* Continue clearing the other browser store. */ }
+    }
+    stopKeyTimer();
+    resetGeminiRequestState();
+    updateApiKeyBadge();
 }
 
 export function getApiKey() {
-    const value = keyData()?.value;
-    return Array.isArray(value) ? value[0] : value || null;
-}
-
-export function getApiKeyList() {
-    const value = keyData()?.value;
-    return [...new Set((Array.isArray(value) ? value : [value]).filter(Boolean))];
+    return keyData()?.value || null;
 }
 
 function setApiKeyStatus(apiKey, status) {
-    const data = keyData();
-    if (!data) return;
-    const values = Array.isArray(data.value) ? data.value : [data.value];
-    const index = values.indexOf(apiKey);
-    if (index < 0) return;
-    const statuses = Array.isArray(data.keyStatuses) ? [...data.keyStatuses] : values.map(() => 'unverified');
-    statuses[index] = status;
-    data.keyStatuses = statuses;
+    const record = keyRecord();
+    if (!record || record.data.value !== apiKey) return;
+    record.data.status = status;
     try {
-        sessionStorage.setItem('gemini_api_key_data', JSON.stringify(data));
+        record.storage.setItem(API_KEY_DATA_KEY, JSON.stringify(record.data));
         updateApiKeyBadge();
-    } catch { /* Keep request routing functional if browser storage is unavailable. */ }
+    } catch { /* Keep the current request functional if browser storage is unavailable. */ }
 }
 
 function nextPacificMidnight() {
@@ -202,13 +190,6 @@ function nextPacificMidnight() {
         else high = middle;
     }
     return high;
-}
-
-function quotaCooldown(body) {
-    const text = JSON.stringify(body || {});
-    if (/per day|daily|RPD|GenerateRequestsPerDay/i.test(text)) return nextPacificMidnight();
-    const seconds = Number(text.match(/"retryDelay"\s*:\s*"(\d+)s"/)?.[1]);
-    return Date.now() + (seconds > 0 ? seconds * 1000 : 60000);
 }
 
 function pacificDateKey(timestamp = Date.now()) {
@@ -232,28 +213,6 @@ function writeQuotaLedger(ledger) {
     Object.assign(inMemoryQuotaLedger, ledger);
     try { localStorage.setItem(CONFIG.RATE_LEDGER_STORAGE_KEY, JSON.stringify(ledger)); }
     catch { /* The in-memory copy still protects this page session. */ }
-}
-
-function fallbackKeyFingerprint(apiKey) {
-    // This is a storage namespace, not a security primitive; never persist the API key itself.
-    let first = 0x811c9dc5;
-    let second = 0x9e3779b9;
-    for (let index = 0; index < apiKey.length; index++) {
-        const code = apiKey.charCodeAt(index);
-        first = Math.imul(first ^ code, 0x01000193) >>> 0;
-        second = Math.imul(second ^ (code + index), 0x85ebca6b) >>> 0;
-    }
-    return `${first.toString(16)}${second.toString(16)}`;
-}
-
-async function getProjectFingerprint(apiKey) {
-    try {
-        if (globalThis.crypto?.subtle && globalThis.TextEncoder) {
-            const digest = await globalThis.crypto.subtle.digest('SHA-256', new globalThis.TextEncoder().encode(apiKey));
-            return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-        }
-    } catch { /* Use a non-secret namespace if Web Crypto is unavailable, e.g. over LAN HTTP. */ }
-    return fallbackKeyFingerprint(apiKey);
 }
 
 function countTextTokens(text) {
@@ -280,14 +239,25 @@ function withQuotaLedgerLock(operation) {
         : operation();
 }
 
-function inspectAndReserveQuota(projectHash, mode, estimatedTokens) {
+function inspectAndReserveQuota(mode, estimatedTokens) {
     return withQuotaLedgerLock(() => {
         const limits = CONFIG.QUOTAS[mode];
         const now = Date.now();
         const ledger = readQuotaLedger();
-        const ledgerKey = `${projectHash}:${mode}`;
+        const ledgerKey = mode;
         let bucket = ledger[ledgerKey];
+        const shared = ledger.shared || { nextRequestAt: 0, providerPauseUntil: 0, samples: [], dailyRequests: 0 };
+        ledger.shared = shared;
+        shared.updatedAt = now;
+        if (shared.providerPauseUntil > now) {
+            return { providerWaitMs: shared.providerPauseUntil - now };
+        }
         const today = pacificDateKey(now);
+        if (shared.day !== today) {
+            shared.day = today;
+            shared.dailyRequests = 0;
+        }
+        shared.samples = (shared.samples || []).filter(sample => sample.at > now - MINUTE_MS);
         if (!bucket) {
             bucket = { day: today, dailyRequests: 0, samples: [], nextRequestAt: 0 };
             ledger[ledgerKey] = bucket;
@@ -303,13 +273,16 @@ function inspectAndReserveQuota(projectHash, mode, estimatedTokens) {
             writeQuotaLedger(ledger);
             return { tooLarge: true };
         }
-        if (bucket.dailyRequests >= limits.RPD) {
+        if (bucket.dailyRequests >= limits.RPD || shared.dailyRequests >= CONFIG.QUOTAS.STANDARD.RPD) {
             writeQuotaLedger(ledger);
             return { dailyLimited: true };
         }
 
         const rpmWait = bucket.samples.length >= limits.RPM
             ? bucket.samples[0].at + MINUTE_MS - now
+            : 0;
+        const sharedRpmWait = shared.samples.length >= CONFIG.QUOTAS.STANDARD.RPM
+            ? shared.samples[0].at + MINUTE_MS - now
             : 0;
         const currentTokens = bucket.samples.reduce((total, sample) => total + sample.tokens, 0);
         let tpmWait = 0;
@@ -323,9 +296,21 @@ function inspectAndReserveQuota(projectHash, mode, estimatedTokens) {
                 }
             }
         }
+        let sharedTpmWait = 0;
+        let sharedExcessTokens = shared.samples.reduce((total, sample) => total + sample.tokens, 0)
+            + estimatedTokens - CONFIG.QUOTAS.STANDARD.TPM;
+        if (sharedExcessTokens > 0) {
+            for (const sample of shared.samples) {
+                sharedExcessTokens -= sample.tokens;
+                if (sharedExcessTokens <= 0) {
+                    sharedTpmWait = sample.at + MINUTE_MS - now;
+                    break;
+                }
+            }
+        }
         const spacingMs = Math.ceil((MINUTE_MS / limits.RPM) * 1.15);
-        const spacingWait = (bucket.nextRequestAt || 0) - now;
-        const waitMs = Math.max(0, rpmWait, tpmWait, spacingWait);
+        const spacingWait = Math.max(bucket.nextRequestAt || 0, shared.nextRequestAt || 0) - now;
+        const waitMs = Math.max(0, rpmWait, sharedRpmWait, tpmWait, sharedTpmWait, spacingWait);
         if (waitMs > 0) {
             writeQuotaLedger(ledger);
             return { waitMs };
@@ -334,9 +319,22 @@ function inspectAndReserveQuota(projectHash, mode, estimatedTokens) {
         const reservationId = `${now}-${Math.random().toString(36).slice(2)}`;
         bucket.dailyRequests++;
         bucket.samples.push({ id: reservationId, at: now, tokens: estimatedTokens });
+        shared.dailyRequests++;
+        shared.samples.push({ id: reservationId, at: now, tokens: estimatedTokens });
         bucket.nextRequestAt = now + spacingMs;
+        shared.nextRequestAt = now + spacingMs;
         writeQuotaLedger(ledger);
         return { reservation: { ledgerKey, reservationId } };
+    });
+}
+
+function pauseProviderUntil(until) {
+    return withQuotaLedgerLock(() => {
+        const ledger = readQuotaLedger();
+        ledger.shared = ledger.shared || {};
+        ledger.shared.providerPauseUntil = Math.max(ledger.shared.providerPauseUntil || 0, until);
+        ledger.shared.updatedAt = Date.now();
+        writeQuotaLedger(ledger);
     });
 }
 
@@ -348,6 +346,8 @@ function updateQuotaReservation(reservation, actualInputTokens) {
         const sample = bucket?.samples?.find(item => item.id === reservation.reservationId);
         if (!sample) return;
         sample.tokens = Math.ceil(actualInputTokens);
+        const sharedSample = ledger.shared?.samples?.find(item => item.id === reservation.reservationId);
+        if (sharedSample) sharedSample.tokens = sample.tokens;
         bucket.updatedAt = Date.now();
         writeQuotaLedger(ledger);
     });
@@ -368,34 +368,18 @@ function waitForQuota(ms, signal) {
     });
 }
 
-async function reserveNextCandidate(candidates, mode, payload, signal) {
+async function reserveRequest(mode, payload, signal) {
     const estimatedTokens = Math.ceil(estimateInputTokens(payload) * 1.2);
-    let lastBlockedReason = null;
-    while (candidates.length) {
-        let earliestWait = Infinity;
-        let activeCandidates = 0;
-        let dailyLimitedCandidates = 0;
-        let tokenLimitedCandidates = 0;
-        for (const candidate of candidates) {
-            const now = Date.now();
-            if (candidate.route.cooldownUntil > now || (candidate.route.models[candidate.model] || 0) > now) continue;
-            activeCandidates++;
-            const result = await inspectAndReserveQuota(candidate.projectHash, mode, estimatedTokens);
-            if (result.reservation) return { ...candidate, reservation: result.reservation };
-            if (result.dailyLimited) { dailyLimitedCandidates++; lastBlockedReason = 'daily'; continue; }
-            if (result.tooLarge) { tokenLimitedCandidates++; lastBlockedReason = 'tpm'; continue; }
-            if (result.waitMs > 0) earliestWait = Math.min(earliestWait, result.waitMs);
+    while (true) {
+        if (signal?.aborted) throw new DOMException('已取消', 'AbortError');
+        const result = await inspectAndReserveQuota(mode, estimatedTokens);
+        if (result.reservation) return result.reservation;
+        if (result.dailyLimited || result.tooLarge) throw localQuotaError(mode, result.tooLarge ? 'tpm' : 'daily');
+        if (result.providerWaitMs > 30000) {
+            throw new Error('Google 要求暫停請求，請約 ' + Math.ceil(result.providerWaitMs / 1000) + ' 秒後再試。');
         }
-        if (earliestWait < Infinity) {
-            await waitForQuota(earliestWait + Math.floor(Math.random() * 250), signal);
-            continue;
-        }
-        if (activeCandidates > 0 && dailyLimitedCandidates + tokenLimitedCandidates === activeCandidates) {
-            return { blocked: tokenLimitedCandidates > 0 ? 'tpm' : 'daily' };
-        }
-        return null;
+        await waitForQuota(result.providerWaitMs || result.waitMs || 1000, signal);
     }
-    return lastBlockedReason ? { blocked: lastBlockedReason } : null;
 }
 
 function localQuotaError(mode, reason) {
@@ -405,220 +389,147 @@ function localQuotaError(mode, reason) {
     }
     if (reason === 'daily') return new Error(t('model_mode_error_standard_daily'));
     if (reason === 'tpm') return new Error(t('model_mode_error_tpm'));
-    return null;
+    return new Error('本機 Gemini 請求限制已達上限，請稍後重試。');
 }
 
-export async function makeCentralizedRequest(payload, signal, requestedModelName = null, operationLabel = '出題') {
-    const keys = getApiKeyList();
-    if (!keys.length) throw new Error(t('error_api_missing'));
+function useRequestSlot(budget, kind) {
+    if (budget[kind] < 1) throw new Error('本次操作已達安全重試上限，請稍後再試。');
+    budget[kind]--;
+}
+
+function retryDelay(response, body) {
+    const bodyText = JSON.stringify(body || {});
+    if (/per day|daily|RPD|GenerateRequestsPerDay/i.test(bodyText)) {
+        return { daily: true, until: nextPacificMidnight() };
+    }
+    const header = response.headers?.get('Retry-After');
+    const headerSeconds = Number(header);
+    const headerUntil = header && !Number.isFinite(headerSeconds) ? Date.parse(header) : NaN;
+    const bodySeconds = Number(bodyText.match(/"retryDelay"\s*:\s*"([\d.]+)s"/)?.[1]);
+    const delayMs = header && Number.isFinite(headerSeconds)
+        ? Math.max(0, headerSeconds * 1000)
+        : Number.isFinite(headerUntil)
+            ? Math.max(0, headerUntil - Date.now())
+            : Number.isFinite(bodySeconds)
+                ? Math.max(0, bodySeconds * 1000)
+                : 60000;
+    return { daily: false, until: Date.now() + Math.max(1000, delayMs) };
+}
+
+export async function makeCentralizedRequest(payload, signal, requestedModelName = null, operationLabel = '出題', budget = createGeminiRequestBudget(), requestKind = 'base') {
+    const key = getApiKey();
+    if (!key) throw new Error(t('error_api_missing'));
+    const keyStatus = keyData()?.status;
+    if (keyStatus === 'restricted') throw new Error('這把 API Key 的專案權限受限。請至 Google AI Studio 檢查或依 Google 通知申訴。');
+    if (keyStatus === 'invalid') throw new Error('API Key 無效，請在金鑰設定中更正。');
 
     const mode = requestedModelName === CONFIG.MODELS.HIGH_QUALITY
         ? 'HIGH_QUALITY'
-        : requestedModelName === CONFIG.MODELS.STANDARD
-            ? 'STANDARD'
-            : getGeminiMode();
+        : requestedModelName === CONFIG.MODELS.STANDARD ? 'STANDARD' : getGeminiMode();
     const highQuality = mode === 'HIGH_QUALITY';
-    const modeAllowlist = MODEL_ALLOWLISTS[mode];
-    const orderedKeys = keys.map((key, index) => ({ key, index, route: getRoute(key) }))
-        .filter(item => item.route.cooldownUntil <= Date.now())
-        .sort((a, b) => a.route.count - b.route.count || a.route.lastAt - b.route.lastAt || a.index - b.index);
-    if (!orderedKeys.length) {
-        throw new Error(t(highQuality ? 'model_mode_error_all_projects_hq' : 'model_mode_error_all_projects_standard'));
+    const models = MODEL_ALLOWLISTS[mode].filter(model => !unavailableModels.has(model));
+    if (!models.length) throw new Error(t(highQuality ? 'model_mode_error_hq_unavailable' : 'model_mode_error_standard_unavailable'));
+    const currentPayload = structuredClone(payload);
+    if (!highQuality && currentPayload.generationConfig) {
+        delete currentPayload.generationConfig.thinking;
+        delete currentPayload.generationConfig.include_thoughts;
     }
 
-    let quotaLimited = false;
-    let modelUnavailable = false;
-    let transientFailureSeen = false;
-    let invalidKeySeen = false;
-    for (const item of orderedKeys) {
-        try {
-            item.available = await resolveFlashModelsList(item.key, false);
-        } catch (error) {
-            if ([401, 403].includes(error.status)) {
-                item.route.cooldownUntil = Date.now() + DAY_MS;
-                modelUnavailable = true;
+    let nextKind = requestKind;
+    let retry429Used = false;
+    let retriedTransient = false;
+    let transientCount = 0;
+    for (const [index, model] of models.entries()) {
+        while (true) {
+            if (budget[nextKind] < 1) throw new Error('本次操作已達安全重試上限，請稍後再試。');
+            const reservation = await reserveRequest(mode, currentPayload, signal);
+            useRequestSlot(budget, nextKind);
+            showLoader('AI 正在' + operationLabel + '中...\n(使用模型： ' + getFriendlyModelName(model) + ')');
+            const requestController = new AbortController();
+            const abortForTask = () => requestController.abort(signal?.reason);
+            if (signal?.aborted) abortForTask();
+            else signal?.addEventListener('abort', abortForTask, { once: true });
+            const timeoutId = setTimeout(() => requestController.abort(new DOMException('Gemini 回應逾時', 'TimeoutError')), GEMINI_REQUEST_TIMEOUT_MS);
+            const startedAt = Date.now();
+            let response;
+            let responseText;
+            console.info('[Gemini API] Request started: ' + model);
+            try {
+                response = await fetch(CONFIG.BASE_URL + '/models/' + model + ':generateContent', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+                    body: JSON.stringify(currentPayload), signal: requestController.signal
+                });
+                responseText = await response.text();
+                console.info('[Gemini API] HTTP ' + response.status + ': ' + model + ' (' + (Date.now() - startedAt) + ' ms)');
+            } catch (error) {
+                if (signal?.aborted) throw new DOMException('已取消', 'AbortError');
+                throw new Error(requestController.signal.aborted
+                    ? 'Gemini 回應逾時，請稍後再試。'
+                    : '無法連線至 Gemini，請檢查網路或瀏覽器限制後再試。');
+            } finally {
+                clearTimeout(timeoutId);
+                signal?.removeEventListener('abort', abortForTask);
+            }
+
+            let body = {};
+            try { body = JSON.parse(responseText) || {}; } catch { /* The caller handles malformed successful responses. */ }
+            if (response.ok) {
+                await updateQuotaReservation(reservation, body?.usageMetadata?.promptTokenCount);
+                setApiKeyStatus(key, 'used');
+                body._actualModelUsed = model;
+                body._generationMode = mode;
+                return body;
+            }
+            const providerError = (body.error?.status || '') + ' ' + (body.error?.message || '');
+            if (response.status === 401 || (response.status === 400 && /API_KEY_INVALID|API key (?:is )?(?:not valid|invalid)|invalid API key/i.test(providerError))) {
+                setApiKeyStatus(key, 'invalid');
+                throw new Error('API Key 無效，請在金鑰設定中更正。');
+            }
+            if (response.status === 403) {
+                setApiKeyStatus(key, 'restricted');
+                throw new Error('Google 拒絕這把 API Key 的專案權限（403）。本次操作已停止，請至 Google AI Studio 檢查或依通知申訴。');
+            }
+            if (response.status === 429) {
+                const limit = retryDelay(response, body);
+                await pauseProviderUntil(limit.until);
+                if (limit.daily) throw new Error('Google 專案今日額度已用盡，請待額度重置後再試。');
+                const delayMs = limit.until - Date.now();
+                if (retry429Used || delayMs > 30000 || budget.fallback < 1) {
+                    throw new Error('Google 請求速率已達限制，請約 ' + Math.ceil(delayMs / 1000) + ' 秒後再試。');
+                }
+                retry429Used = true;
+                nextKind = 'fallback';
+                await waitForQuota(delayMs, signal);
                 continue;
             }
-            if (error.status === 429) {
-                item.route.cooldownUntil = quotaCooldown({ error: { message: error.message } });
-                quotaLimited = true;
-                continue;
+            if (response.status === 404) {
+                unavailableModels.add(model);
+                nextKind = 'fallback';
+                break;
             }
-            if (error.status >= 500) {
-                item.route.cooldownUntil = Date.now() + 60000;
-                modelUnavailable = true;
-                continue;
+            if ([408, 500, 502, 503, 504].includes(response.status)) {
+                if (budget.fallback < 1) throw new Error('Gemini 服務暫時忙碌，已達本次安全重試上限，請稍後再試。');
+                const delayMs = Math.min(1000 * (2 ** transientCount++), 8000) + Math.floor(Math.random() * 250);
+                nextKind = 'fallback';
+                if (!retriedTransient) {
+                    retriedTransient = true;
+                    await waitForQuota(delayMs, signal);
+                    continue;
+                }
+                if (index < models.length - 1) {
+                    await waitForQuota(delayMs, signal);
+                    break;
+                }
+                throw new Error('Gemini 服務暫時忙碌，請稍後再試。');
             }
-            throw error;
+            throw new Error('Gemini 呼叫失敗 (HTTP ' + response.status + ')：' + (body.error?.message || '請稍後再試'));
         }
-        if (!item.available.some(name => isAllowedModel(name, modeAllowlist))) modelUnavailable = true;
-        item.projectHash = await getProjectFingerprint(item.key);
     }
-
-    const models = [...new Set(orderedKeys.flatMap(item => item.available || []))]
-        .filter(name => isAllowedModel(name, modeAllowlist))
-        .sort((a, b) => modelPriority(a, highQuality) - modelPriority(b, highQuality) || b.localeCompare(a, undefined, { numeric: true }));
-    const candidates = models.flatMap(model => orderedKeys
-        .filter(item => (item.available || []).includes(model) && item.projectHash)
-        .map(item => ({ ...item, model })));
-    const primaryModelPriority = models.length ? modelPriority(models[0], highQuality) : -1;
-    const attemptedPairs = new Set();
-    const transientFailuresByPriority = new Map();
-    const exhaustedTransientPriorities = new Set();
-    let transientFailureCount = 0;
-
-    async function advanceAfterTransientFailure(model, route, projectHash) {
-        route.models[model] = Date.now() + 60000;
-        const priority = modelPriority(model, highQuality);
-        const failuresAtPriority = (transientFailuresByPriority.get(priority) || 0) + 1;
-        transientFailuresByPriority.set(priority, failuresAtPriority);
-
-        const canRetryPrimaryAcrossProject = priority === primaryModelPriority
-            && failuresAtPriority === 1
-            && candidates.some(candidate => modelPriority(candidate.model, highQuality) === priority
-                && candidate.projectHash !== projectHash
-                && !attemptedPairs.has(`${candidate.projectHash}:${candidate.model}`)
-                && candidate.route.cooldownUntil <= Date.now()
-                && (candidate.route.models[candidate.model] || 0) <= Date.now());
-        if (!canRetryPrimaryAcrossProject) exhaustedTransientPriorities.add(priority);
-
-        const hasNextCandidate = candidates.some(candidate =>
-            !attemptedPairs.has(`${candidate.projectHash}:${candidate.model}`)
-            && !exhaustedTransientPriorities.has(modelPriority(candidate.model, highQuality))
-            && candidate.route.cooldownUntil <= Date.now()
-            && (candidate.route.models[candidate.model] || 0) <= Date.now()
-        );
-        if (!hasNextCandidate) return false;
-
-        const delayMs = Math.min(1000 * (2 ** transientFailureCount), 8000) + Math.floor(Math.random() * 250);
-        transientFailureCount++;
-        const fallbackType = canRetryPrimaryAcrossProject ? 'one cross-project retry of the current model' : 'the next model in this mode';
-        console.warn(`[Gemini API] Backing off ${delayMs} ms before ${fallbackType}.`);
-        await waitForQuota(delayMs, signal);
-        return true;
-    }
-
-    while (true) {
-        const pending = candidates.filter(candidate =>
-            !attemptedPairs.has(`${candidate.projectHash}:${candidate.model}`)
-            && !exhaustedTransientPriorities.has(modelPriority(candidate.model, highQuality))
-        );
-        const selected = await reserveNextCandidate(pending, mode, payload, signal);
-        if (selected?.blocked) throw localQuotaError(mode, selected.blocked);
-        if (!selected) break;
-
-        const { key, route, model, projectHash, reservation } = selected;
-        attemptedPairs.add(`${projectHash}:${model}`);
-        route.count++;
-        route.lastAt = Date.now();
-        showLoader(`AI 正在${operationLabel}中...\n(使用模型： ${getFriendlyModelName(model)})`);
-
-        const currentPayload = structuredClone(payload);
-        if (!highQuality && currentPayload.generationConfig) {
-            delete currentPayload.generationConfig.thinking;
-            delete currentPayload.generationConfig.include_thoughts;
-        }
-
-        let response;
-        let responseText = '';
-        const requestStartedAt = Date.now();
-        const requestController = new AbortController();
-        const abortForTask = () => requestController.abort(signal?.reason);
-        if (signal?.aborted) abortForTask();
-        else signal?.addEventListener('abort', abortForTask, { once: true });
-        const timeoutId = setTimeout(() => {
-            requestController.abort(new DOMException('Gemini 回應逾時', 'TimeoutError'));
-        }, GEMINI_REQUEST_TIMEOUT_MS);
-        console.info(`[Gemini API] Request started: ${model}`);
-        try {
-            // Each provider attempt gets a separate quota reservation; don't burst-retry one project.
-            response = await fetch(`${CONFIG.BASE_URL}/models/${model}:generateContent`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-                body: JSON.stringify(currentPayload), signal: requestController.signal
-            });
-            responseText = await response.text();
-            console.info(`[Gemini API] HTTP ${response.status}: ${model} (${Date.now() - requestStartedAt} ms)`);
-        } catch (error) {
-            if (signal?.aborted) throw new DOMException('已取消', 'AbortError');
-            transientFailureSeen = true;
-            const elapsedMs = Date.now() - requestStartedAt;
-            if (requestController.signal.aborted) {
-                console.error(`[Gemini API] Timed out: ${model} (${elapsedMs} ms)`);
-            } else {
-                console.error(`[Gemini API] Network request failed: ${model} (${elapsedMs} ms)`, error);
-            }
-            if (await advanceAfterTransientFailure(model, route, projectHash)) continue;
-            break;
-        } finally {
-            clearTimeout(timeoutId);
-            signal?.removeEventListener('abort', abortForTask);
-        }
-        let responseData = {};
-        try { responseData = JSON.parse(responseText) || {}; } catch { /* Report malformed successful responses through the normal parser. */ }
-
-        if (response.ok) {
-            const result = responseData;
-            await updateQuotaReservation(reservation, result?.usageMetadata?.promptTokenCount);
-            setApiKeyStatus(key, 'used');
-            if (invalidKeySeen) showToast(t('api_key_invalid_skipped'), 'warning');
-            if (result) {
-                result._actualModelUsed = model;
-                result._generationMode = mode;
-            }
-            return result;
-        }
-
-        const body = responseData;
-        const providerError = `${body.error?.status || ''} ${body.error?.message || ''}`;
-        const invalidApiKey = response.status === 401
-            || (response.status === 400 && /API_KEY_INVALID|API key (?:is )?(?:not valid|invalid)|invalid API key/i.test(providerError));
-        if (invalidApiKey) {
-            route.cooldownUntil = Date.now() + DAY_MS;
-            setApiKeyStatus(key, 'invalid');
-            invalidKeySeen = true;
-            modelUnavailable = true;
-            continue;
-        }
-        if (response.status === 403) {
-            route.cooldownUntil = Date.now() + DAY_MS;
-            modelUnavailable = true;
-            continue;
-        }
-        if (response.status === 404) {
-            route.models[model] = Date.now() + DAY_MS;
-            modelUnavailable = true;
-            continue;
-        }
-        if (response.status === 429) {
-            const until = quotaCooldown(body);
-            if (/PerModel|per.model|model quota/i.test(JSON.stringify(body))) route.models[model] = until;
-            else route.cooldownUntil = until;
-            quotaLimited = true;
-            continue;
-        }
-        if ([408, 500, 502, 503, 504].includes(response.status)) {
-            transientFailureSeen = true;
-            if (await advanceAfterTransientFailure(model, route, projectHash)) continue;
-            break;
-        }
-        throw new Error(`Gemini 呼叫失敗 (HTTP ${response.status})：${body.error?.message || '請稍後再試'}`);
-    }
-
-    if (highQuality && quotaLimited) throw new Error(t('model_mode_error_hq_limited'));
-    if (quotaLimited) throw new Error('目前 Gemini 模型額度或速率已達限制，請稍後重新操作。');
-    if (transientFailureSeen) {
-        const nextStep = highQuality ? '請稍後重試，或手動切換標準模式。' : '請稍後重試。';
-        throw new Error(`Gemini ${highQuality ? '高品質' : ''}模型暫時無法回應，已依目前模式嘗試可用備援。${nextStep}`);
-    }
-    if (invalidKeySeen) throw new Error('有 API 金鑰未通過實際生成驗證，請在金鑰設定中更正或移除。系統已嘗試其他可用金鑰。');
-    if (highQuality && modelUnavailable) throw new Error(t('model_mode_error_hq_unavailable'));
-    if (modelUnavailable) throw new Error('目前設定的專案沒有可用的此模式模型，請確認 API Key 與模型權限。');
-    throw new Error('目前沒有可用的 Gemini Key 與 Flash 模型。');
+    throw new Error(t(highQuality ? 'model_mode_error_hq_unavailable' : 'model_mode_error_standard_unavailable'));
 }
 
-// 為了內部向後相容
-async function makeGeminiRequest(payload, signal, modelName = null) {
-    return await makeCentralizedRequest(payload, signal, modelName);
+async function makeGeminiRequest(payload, signal, modelName = null, budget, requestKind = 'base') {
+    return makeCentralizedRequest(payload, signal, modelName, '出題', budget, requestKind);
 }
 function extractJsonObject(rawText) {
     const text = rawText
@@ -722,7 +633,7 @@ function createQualityFailureError(issues, initialDiagnostics, retryDiagnostics)
     return error;
 }
 
-export async function generateSingleBatch(count, type, difficulty, text, images, questionStyle, signal, languageChoice, studentLevel, bloomLevel, keywords = [], expertParams = null, isHighQuality = getGeminiMode() === 'HIGH_QUALITY', domain = 'chinese', contextType = '', questionTypePlan = null, previousQuestionNotes = []) {
+export async function generateSingleBatch(count, type, difficulty, text, images, questionStyle, signal, languageChoice, studentLevel, bloomLevel, keywords = [], expertParams = null, isHighQuality = getGeminiMode() === 'HIGH_QUALITY', domain = 'chinese', contextType = '', questionTypePlan = null, previousQuestionNotes = [], budget = createGeminiRequestBudget()) {
     // 根據模式選擇模型與配額
     const modelKey = isHighQuality ? 'HIGH_QUALITY' : 'STANDARD';
     const modelName = CONFIG.MODELS[modelKey];
@@ -752,7 +663,7 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
         "generationConfig": genConfig
     };
 
-    let result = await makeGeminiRequest(initialPayload, signal, modelName);
+    let result = await makeGeminiRequest(initialPayload, signal, modelName, budget);
     let parsedResult = parseGeminiResponse(result);
     const initialDiagnostics = responseDiagnostics(result, parsedResult);
     let repaired = false;
@@ -760,7 +671,7 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
 
     while (true) {
         if (parsedResult.error && !parsedResult.validJson) {
-            if (repaired || !parsedResult.rawText.trim()) {
+            if (repaired || retried || !parsedResult.rawText.trim()) {
                 throw createFormatFailureError(initialDiagnostics, responseDiagnostics(result, parsedResult));
             }
             console.warn('[Gemini API] Invalid JSON, attempting syntax repair:', responseDiagnostics(result, parsedResult));
@@ -769,7 +680,7 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
                 contents: [{ role: 'user', parts: [{ text: `請修復下列 JSON。解析錯誤：${parsedResult.error?.message || '格式不完整'}\n\n原始回應：\n${parsedResult.rawText}` }] }],
                 generationConfig: { ...genConfig, temperature: 0 }
             };
-            result = await makeGeminiRequest(repairPayload, signal, modelName);
+            result = await makeGeminiRequest(repairPayload, signal, modelName, budget, 'correction');
             parsedResult = parseGeminiResponse(result);
             repaired = true;
             continue;
@@ -785,13 +696,13 @@ export async function generateSingleBatch(count, type, difficulty, text, images,
                 meta: { promptVersion: PROMPT_VERSION, modelName: result?._actualModelUsed || modelName, repaired, retried }
             };
         }
-        if (retried) {
+        if (retried || repaired) {
             throw createQualityFailureError(issues, initialDiagnostics, responseDiagnostics(result, parsedResult));
         }
 
         console.warn('[Gemini API] Incomplete question batch, retrying once:', issues);
         const retryParts = [...taskParts, { text: `上一份輸出未符合格式要求：${issues.join('；')}。請重新從參考內容生成完整的 ${count} 題，依指定題型順序與認知層次輸出；不要沿用缺漏或重複的題目。` }];
-        result = await makeGeminiRequest({ ...initialPayload, contents: [{ role: 'user', parts: retryParts }] }, signal, modelName);
+        result = await makeGeminiRequest({ ...initialPayload, contents: [{ role: 'user', parts: retryParts }] }, signal, modelName, budget, 'correction');
         parsedResult = parseGeminiResponse(result);
         retried = true;
     }

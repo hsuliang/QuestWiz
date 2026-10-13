@@ -1,11 +1,11 @@
 import { QUESTION_STYLE } from './constants.js';
-import { getApiKey, getGeminiMode } from './api.js?v=20261012-domain-review-1';
+import { getApiKey, getApiKeyInfo, getGeminiMode } from './api.js?v=20261013R1';
 import * as state from './state.js';
 import * as EditorHandlers from './handlers/editor.js';
 import { isAutoGenerateEnabled } from './utils.js';
 import { elements } from './dom.js';
 import { CONFIG, TAIWAN_EDU_DOMAINS, TAIWAN_EDU_ISSUES, TAIWAN_PUBLISHERS } from './config.js?v=20261012-question-quality-5';
-import { translations } from './translations.js?v=20261012-question-quality-5';
+import { translations } from './translations.js?v=20261013R1';
 import { refreshUI } from './view/sync.js';
 
 // Import View Layer
@@ -95,51 +95,30 @@ export function stopKeyTimer() {
 }
 
 export function updateApiKeyBadge() {
-    let count = 0;
-    let usedCount = 0;
-    let invalidCount = 0;
-    let unverifiedCount = 0;
-    try {
-        const data = JSON.parse(sessionStorage.getItem('gemini_api_key_data') || 'null');
-        if (data && Date.now() < data.expires) {
-            const values = Array.isArray(data.value) ? data.value : [data.value];
-            const keys = [...new Set(values.filter(Boolean))];
-            const statuses = Array.isArray(data.keyStatuses) ? data.keyStatuses : [];
-            count = keys.length;
-            usedCount = keys.filter((_, index) => statuses[index] === 'used').length;
-            invalidCount = keys.filter((_, index) => statuses[index] === 'invalid').length;
-            unverifiedCount = count - usedCount - invalidCount;
-        }
-    } catch { /* Invalid session data is treated as empty. */ }
+    const isConfigured = Boolean(getApiKeyInfo());
 
-    const countEl = document.getElementById('header-api-key-count');
-    if (countEl) countEl.textContent = String(count);
-    document.querySelector('.app-api-key-count')?.classList.toggle('is-empty', count === 0);
+    const status = document.getElementById('header-api-key-status');
+    if (!status) return;
+    const isEnglish = (localStorage.getItem('quizGenLanguage_v1') || 'zh-TW') === 'en';
+    status.dataset.i18n = isConfigured ? 'api_key_configured' : 'api_key_unconfigured';
+    status.textContent = isConfigured
+        ? (isEnglish ? 'Configured' : '已設定')
+        : (isEnglish ? 'Not set' : '未設定');
+    status.classList.toggle('is-empty', !isConfigured);
+}
 
-    const status = document.getElementById('api-modal-status-text');
-    if (status) {
-        const isEnglish = (localStorage.getItem('quizGenLanguage_v1') || 'zh-TW') === 'en';
-        if (count === 0) {
-            status.textContent = isEnglish ? 'No keys saved' : '尚未設定金鑰';
-        } else if (invalidCount > 0) {
-            status.textContent = isEnglish
-                ? `${usedCount} used successfully · ${invalidCount} need correction${unverifiedCount ? ` · ${unverifiedCount} not verified` : ''}`
-                : `${usedCount ? `${usedCount} 組曾成功使用 · ` : ''}${invalidCount} 組需更正${unverifiedCount ? ` · ${unverifiedCount} 組尚未驗證` : ''}`;
-        } else if (usedCount > 0 && unverifiedCount > 0) {
-            status.textContent = isEnglish
-                ? `${usedCount} used successfully · ${unverifiedCount} not yet verified`
-                : `${usedCount} 組曾成功使用 · ${unverifiedCount} 組尚未驗證`;
-        } else if (usedCount > 0) {
-            status.textContent = isEnglish
-                ? `${usedCount} ${usedCount === 1 ? 'key used' : 'keys used'} successfully`
-                : `${usedCount} 組曾成功使用`;
-        } else {
-            status.textContent = isEnglish
-                ? `${count} saved · not yet verified`
-                : `${count} 組已儲存 · 尚未驗證`;
-        }
-        status.parentElement?.classList.toggle('is-empty', count === 0);
-    }
+export function updateApiKeyLifetimeHint() {
+    const select = document.getElementById('api-key-lifetime');
+    const hint = document.getElementById('api-key-lifetime-hint');
+    if (!select || !hint) return;
+    const mode = select.value;
+    const hintKey = mode === 'session'
+        ? 'api_lifetime_hint_session'
+        : mode === 'permanent'
+            ? 'api_lifetime_hint_permanent'
+            : 'api_lifetime_hint_timed';
+    hint.textContent = t(hintKey);
+    hint.classList.toggle('is-warning', mode === 'permanent');
 }
 
 export function updateGeminiModeBadge(mode = getGeminiMode()) {
@@ -155,18 +134,20 @@ export function updateGeminiModeBadge(mode = getGeminiMode()) {
 
 export function startKeyTimer(expirationTime) {
     const display = document.getElementById('api-key-timer');
-    if (!display) return;
     clearInterval(state.getKeyTimerInterval());
     updateApiKeyBadge();
-    display.style.display = 'inline';
-    display.classList.remove('text-green-600', 'text-red-600'); // Reset colors
+    if (display) {
+        display.style.display = 'inline';
+        display.classList.remove('text-green-600', 'text-red-600');
+    }
     
     const update = () => {
         const rem = expirationTime - Date.now();
         if (rem <= 0) { 
-            display.textContent = '金鑰已過期'; 
-            display.classList.add('text-red-600');
-            // stopKeyTimer(); // Don't stop immediately, let user see it expired
+            if (display) {
+                display.textContent = '金鑰已過期';
+                display.classList.add('text-red-600');
+            }
             getApiKey(); // Trigger cleanup if needed
             updateApiKeyBadge();
             return; 
@@ -174,7 +155,7 @@ export function startKeyTimer(expirationTime) {
         const h = Math.floor((rem / 3600000) % 24).toString().padStart(2, '0');
         const m = Math.floor((rem / 60000) % 60).toString().padStart(2, '0');
         const s = Math.floor((rem / 1000) % 60).toString().padStart(2, '0');
-        display.textContent = `(有效時間 ${h}:${m}:${s})`;
+        if (display) display.textContent = `(有效時間 ${h}:${m}:${s})`;
     };
     update();
     state.setKeyTimerInterval(setInterval(update, 1000));
@@ -250,7 +231,7 @@ export function populateVersionHistory() {
     content.innerHTML = `
         <div class="space-y-6">
             <div class="border-l-4 border-violet-600 pl-4">
-                <h4 class="font-bold text-lg text-violet-800">丙午．寒露．20261010R6</h4>
+                <h4 class="font-bold text-lg text-violet-800">丙午．寒露．20261013R1</h4>
                 <ul class="list-disc list-inside text-sm text-gray-600 mt-2 space-y-1">
                     <li>標準與高品質模式各自使用指定的 Flash 模型清單，並依專案與模式保守控管請求用量。</li>
                     <li>API 金鑰先儲存，首次使用時驗證；金鑰狀態會顯示在設定中。</li>
@@ -425,6 +406,7 @@ export function updateLanguage(lang) {
     if (libraryButtonLabel) document.getElementById('header-library-btn')?.setAttribute('aria-label', libraryButtonLabel.textContent);
     updateApiKeyBadge();
     updateGeminiModeBadge();
+    updateApiKeyLifetimeHint();
     syncExportFormatButtons();
 }
 

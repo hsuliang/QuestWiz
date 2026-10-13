@@ -1,4 +1,4 @@
-import { generateSingleBatch, getGeminiMode } from '../api.js?v=20261012-domain-review-1';
+import { generateSingleBatch, getGeminiMode, createGeminiRequestBudget } from '../api.js?v=20261013R1';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
@@ -192,6 +192,8 @@ async function proceedWithGeneration(settings) {
     try {
         const bloomDistribution = calculateBloomDistribution(settings.totalQuestions, settings.questionStyle, settings.difficulty, settings.userSelectedLevels);
         const levelsToProcess = Object.keys(bloomDistribution).filter(l => bloomDistribution[l] > 0);
+        const batchCount = levelsToProcess.reduce((total, level) => total + Math.ceil(bloomDistribution[level] / 5), 0);
+        const requestBudget = createGeminiRequestBudget(batchCount);
         const questionTypePlan = buildQuestionTypePlan(settings.totalQuestions, settings.questionType);
         let questionTypePlanOffset = 0;
         let allGeneratedQs = [];
@@ -218,7 +220,7 @@ async function proceedWithGeneration(settings) {
                             : '';
                         const concept = question.design_concept ? `；考查重點：${question.design_concept}` : '';
                         return `${question.text}${concept}${answerPosition}`;
-                    })
+                    }), requestBudget
                 );
                 if (!result || !Array.isArray(result.questions) || result.questions.length !== batchSize) {
                     throw new Error('AI 回傳題數不足，請重新出題。');

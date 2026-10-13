@@ -2,7 +2,7 @@
 export const CONFIG = {
     BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
     MODEL_MODE_STORAGE_KEY: 'gemini_model_mode_v1',
-    RATE_LEDGER_STORAGE_KEY: 'questwiz_gemini_rate_ledger_v1',
+    RATE_LEDGER_STORAGE_KEY: 'questwiz_gemini_rate_ledger_v2',
     MODELS: {
         STANDARD: 'gemini-3.5-flash-lite',
         HIGH_QUALITY: 'gemini-3.8-flash',

@@ -1,14 +1,14 @@
 import { elements } from './dom.js';
-import * as ui from './ui.js?v=20261012-question-quality-5';
+import * as ui from './ui.js?v=20261013R1';
 import * as utils from './utils.js';
 import * as state from './state.js';
-import * as api from './api.js?v=20261012-domain-review-1';
+import * as api from './api.js?v=20261013R1';
 import { watchAdminAuth, signInAdmin, signOutAdmin } from './db.js';
 
 // Import Handlers
 import * as SessionHandlers from './handlers/session.js';
-import * as GenHandlers from './handlers/generator.js?v=20261012-domain-review-2';
-import * as ReviewHandlers from './handlers/review.js?v=20261012-domain-review-3';
+import * as GenHandlers from './handlers/generator.js?v=20261013R1';
+import * as ReviewHandlers from './handlers/review.js?v=20261013R1';
 import * as LibHandlers from './handlers/library.js';
 import * as ContentHandlers from './handlers/content.js';
 import * as AnalyzerHandlers from './handlers/contentAnalyzer.js';
@@ -112,14 +112,21 @@ document.addEventListener('DOMContentLoaded', () => {
     safeExecute('Restore API Key', () => {
         const keyDataString = sessionStorage.getItem('gemini_api_key_data');
         if (keyDataString) {
-            const keyData = JSON.parse(keyDataString);
-            if (Date.now() < keyData.expires) {
-                // [Fix] 相容舊格式：若有 value 則還原 (支援陣列或單字串)
-                const val = Array.isArray(keyData.value) ? keyData.value.join('\n') : keyData.value;
-                if (elements.apiKeyInput) elements.apiKeyInput.value = val;
-                ui.startKeyTimer(keyData.expires);
+            let legacyData;
+            try { legacyData = JSON.parse(keyDataString); } catch { /* Invalid storage is cleared by the API key reader. */ }
+            if (Array.isArray(legacyData?.value)) {
+                api.clearSavedApiKey();
+                ui.showToast('金鑰設定已改為單一金鑰，請重新輸入一把 API Key。', 'warning');
             }
         }
+        const keyData = api.getApiKeyInfo();
+        const preferredLifetime = api.getPreferredApiKeyLifetime();
+        if (elements.apiKeyLifetimeSelect) elements.apiKeyLifetimeSelect.value = keyData?.storageMode || preferredLifetime;
+        if (elements.apiKeyInput && keyData) elements.apiKeyInput.value = keyData.value;
+        if (Number.isFinite(keyData?.expires)) ui.startKeyTimer(keyData.expires);
+        else ui.stopKeyTimer();
+        ui.updateApiKeyLifetimeHint();
+        ui.updateApiKeyBadge();
     });
 
     // ---------------------------------------------------------
@@ -320,56 +327,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'clearAndNewBtn');
 
         bind(elements.saveApiKeyBtn, 'click', () => {
-            const rawValue = elements.apiKeyInput?.value || '';
-            // 解析多組金鑰：支援換行、逗號、分號分隔
-            const keys = [...new Set(rawValue.split(/[\n,;]+/).map(k => k.trim()).filter(k => k.length > 5))];
-            
-            if (keys.length === 0) {
-                ui.showToast('請輸入有效的 API Key', 'error');
+            const key = (elements.apiKeyInput?.value || '').trim();
+            if (key.length <= 5 || /[\s,;]/.test(key)) {
+                ui.showToast('請只輸入一把有效的 API Key。', 'error');
                 return;
             }
 
-            const expires = Date.now() + (2 * 60 * 60 * 1000);
-            const storageData = {
-                value: keys,
-                expires,
-                isMulti: keys.length > 1,
-                keyStatuses: keys.map(() => 'unverified')
-            };
+            const lifetime = elements.apiKeyLifetimeSelect?.value || '2h';
+            let storageData;
             try {
-                sessionStorage.setItem('gemini_api_key_data', JSON.stringify(storageData));
+                storageData = api.saveApiKey(key, lifetime);
             } catch (err) {
-                console.error('[System] Could not save API keys:', err);
-                ui.showToast('瀏覽器無法儲存金鑰，請檢查瀏覽器儲存空間設定。', 'error');
+                console.error('[System] Could not save API key:', err);
+                ui.showToast(err.message || '瀏覽器無法儲存金鑰，請檢查瀏覽器儲存空間設定。', 'error');
                 return;
             }
 
-            api.resetGeminiRouting();
             applyGeminiModeSelection();
-            if (elements.apiKeyInput) elements.apiKeyInput.value = keys.join('\n');
-            ui.startKeyTimer(expires);
-            ui.showToast(`已儲存 ${keys.length} 組金鑰；首次使用 AI 時會自動驗證。`, 'success');
+            if (elements.apiKeyInput) elements.apiKeyInput.value = key;
+            if (Number.isFinite(storageData.expires)) ui.startKeyTimer(storageData.expires);
+            else ui.stopKeyTimer();
+            ui.showToast('已儲存金鑰；首次使用 AI 時會自動驗證。', 'success');
             closeApiSettings();
         }, 'saveApiKeyBtn');
         bind(elements.clearApiKeyBtn, 'click', () => {
-            sessionStorage.removeItem('gemini_api_key_data');
-            api.resetGeminiRouting();
+            api.clearSavedApiKey();
             if (elements.apiKeyInput) elements.apiKeyInput.value = '';
-            ui.stopKeyTimer();
-            ui.updateApiKeyBadge();
             ui.showToast('API Key 已清除', 'success');
         }, 'clearApiKeyBtn');
+        bind(elements.apiKeyLifetimeSelect, 'change', () => {
+            try { localStorage.setItem('gemini_api_key_lifetime_v1', elements.apiKeyLifetimeSelect.value); }
+            catch { /* Applying the selected storage duration does not depend on retaining this preference. */ }
+            ui.updateApiKeyLifetimeHint();
+        }, 'apiKeyLifetime');
         
         bind(elements.toggleApiKeyVisibilityBtn, 'click', () => {
             if (elements.apiKeyInput) {
-                // 文字框改用 class 切換遮罩
-                elements.apiKeyInput.classList.toggle('password-mask');
+                elements.apiKeyInput.type = elements.apiKeyInput.type === 'password' ? 'text' : 'password';
             }
         }, 'toggleApiKeyVisibilityBtn');
 
-        // 初始狀態：預設遮罩
+        // 初始狀態：預設隱藏金鑰
         if (elements.apiKeyInput) {
-            elements.apiKeyInput.classList.add('password-mask');
+            elements.apiKeyInput.type = 'password';
         }
 
         // 文字選取與標記

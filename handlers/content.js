@@ -1,7 +1,7 @@
 import { QUESTION_STYLE } from '../constants.js';
 import { CONFIG, contentLoadingMessages } from '../config.js';
 import * as ui from '../ui.js';
-import { getGeminiMode, makeCentralizedRequest } from '../api.js?v=20261012-domain-review-1';
+import { getGeminiMode, makeCentralizedRequest } from '../api.js?v=20261013R1';
 import { elements } from '../dom.js';
 import { getContentSystemInstruction } from '../prompts/index.js?v=20261012-domain-review-1';
 import { getAdaptiveRules } from '../prompts/adaptive_matrix.js?v=20261012-question-quality-5'; // [v11.0]
@@ -118,7 +118,7 @@ export async function callGeminiForContent(promptString) {
             "generationConfig": genConfig // [New] 傳入動態組態
         };
 
-        // [Refactor] 使用中央化請求 (支援多金鑰與統一錯誤處理)並指定模型
+        // 使用統一的單金鑰請求與錯誤處理
         const result = await makeCentralizedRequest(payload, null, modelName);
         let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
 

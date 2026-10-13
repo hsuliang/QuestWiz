@@ -5,6 +5,7 @@
 export const elements = {
     // 常用設定 (Settings)
     get apiKeyInput() { return document.getElementById('api-key-input'); },
+    get apiKeyLifetimeSelect() { return document.getElementById('api-key-lifetime'); },
     get saveApiKeyBtn() { return document.getElementById('save-api-key-btn'); },
     get clearApiKeyBtn() { return document.getElementById('clear-api-key-btn'); },
     get toggleApiKeyVisibilityBtn() { return document.getElementById('toggle-api-key-visibility'); },

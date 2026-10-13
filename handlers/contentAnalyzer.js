@@ -1,4 +1,4 @@
-import * as api from '../api.js?v=20261012-domain-review-1';
+import * as api from '../api.js?v=20261013R1';
 import * as ui from '../ui.js';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
@@ -193,7 +193,7 @@ async function requestKeywordAnalysis(text, images, apiKey, signal) {
         "generationConfig": { "temperature": 0.2, "responseMimeType": "application/json" }
     };
 
-    // [Refactor] 使用中央化請求 (支援多金鑰與統一錯誤處理)
+    // 使用統一的單金鑰請求與錯誤處理
     const data = await api.makeCentralizedRequest(payload, signal, modelName);
     
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;

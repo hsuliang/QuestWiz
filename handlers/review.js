@@ -1,5 +1,5 @@
-import { makeCentralizedRequest } from '../api.js?v=20261012-domain-review-1';
-import { getLastGenerationSource } from './generator.js?v=20261012-domain-review-2';
+import { makeCentralizedRequest } from '../api.js?v=20261013R1';
+import { getLastGenerationSource } from './generator.js?v=20261013R1';
 import * as state from '../state.js';
 import { elements } from '../dom.js';
 import { hideLoader } from '../ui.js';
